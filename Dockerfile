@@ -1,40 +1,26 @@
-# Multi-stage build для оптимизации размера
-FROM node:18-alpine as builder
-
-# Устанавливаем зависимости для сборки
-RUN apk add --no-cache python3 make g++
-
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-
-# Production stage
+# Упрощенный single-stage build
 FROM node:18-alpine
 
-# Устанавливаем FFmpeg и необходимые runtime зависимости
+# Устанавливаем FFmpeg и build зависимости
 RUN apk add --no-cache \
     ffmpeg \
+    python3 \
+    make \
+    g++ \
     && rm -rf /var/cache/apk/*
-
-# Создаем пользователя для безопасности
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
 
 # Создаем рабочий каталог
 WORKDIR /app
 
-# Копируем зависимости из builder stage
-COPY --from=builder /app/node_modules ./node_modules
+# Копируем package.json и устанавливаем зависимости
+COPY package*.json ./
+RUN npm install --production
 
 # Копируем исходный код
-COPY --chown=nodejs:nodejs . .
+COPY . .
 
 # Создаем необходимые директории
-RUN mkdir -p /tmp/uploads && \
-    chown -R nodejs:nodejs /tmp/uploads
-
-# Переключаемся на непривилегированного пользователя
-USER nodejs
+RUN mkdir -p /tmp/uploads
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
