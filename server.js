@@ -3,7 +3,7 @@
 
 const express = require('express');
 const multer = require('multer');
-const ffmpeg = require('fluent-ffmpeg');
+const { execSync, spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
@@ -39,6 +39,54 @@ const upload = multer({
 app.get('/health', (req, res) => {
   res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
+
+// Функция для выполнения FFmpeg команд
+function executeFFmpeg(command, timeout = 300000) {
+  return new Promise((resolve, reject) => {
+    console.log('Executing FFmpeg command:', command);
+    
+    const process = spawn('sh', ['-c', command], {
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    
+    let stdout = '';
+    let stderr = '';
+    
+    process.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+    
+    process.stderr.on('data', (data) => {
+      stderr += data.toString();
+      // FFmpeg выводит прогресс в stderr
+      if (data.toString().includes('time=')) {
+        console.log('FFmpeg progress:', data.toString().trim());
+      }
+    });
+    
+    process.on('close', (code) => {
+      if (code === 0) {
+        resolve({ stdout, stderr });
+      } else {
+        reject(new Error(`FFmpeg process exited with code ${code}\nStderr: ${stderr}`));
+      }
+    });
+    
+    process.on('error', (error) => {
+      reject(error);
+    });
+    
+    // Timeout
+    const timer = setTimeout(() => {
+      process.kill('SIGKILL');
+      reject(new Error('FFmpeg process timed out'));
+    }, timeout);
+    
+    process.on('close', () => {
+      clearTimeout(timer);
+    });
+  });
+}
 
 // Основной endpoint для обработки видео с субтитрами
 app.post('/process-video', async (req, res) => {
@@ -103,44 +151,18 @@ app.post('/process-video', async (req, res) => {
     const defaultStyle = "Fontsize=24,PrimaryColour=&Hffffff,OutlineColour=&H000000,Outline=2,Shadow=1";
     const subtitleStyle = style_config?.subtitle_style || defaultStyle;
 
-    // Обрабатываем видео с FFmpeg
+    // Обрабатываем видео с FFmpeg напрямую
     console.log(`[${task_id}] Starting FFmpeg processing`);
     
-    await new Promise((resolve, reject) => {
-      ffmpeg(inputVideoPath)
-        .videoFilters([
-          {
-            filter: 'subtitles',
-            options: {
-              filename: srtPath,
-              force_style: subtitleStyle
-            }
-          }
-        ])
-        .videoCodec(processing_options?.video_codec || 'libx264')
-        .audioCodec(processing_options?.audio_codec || 'copy')
-        .addOptions([
-          '-preset', processing_options?.preset || 'fast',
-          '-crf', processing_options?.crf || '23',
-          '-movflags', '+faststart' // Для быстрого старта воспроизведения
-        ])
-        .output(outputVideoPath)
-        .on('start', (cmd) => {
-          console.log(`[${task_id}] FFmpeg command: ${cmd}`);
-        })
-        .on('progress', (progress) => {
-          console.log(`[${task_id}] Processing: ${Math.round(progress.percent)}% done`);
-        })
-        .on('end', () => {
-          console.log(`[${task_id}] FFmpeg processing completed`);
-          resolve();
-        })
-        .on('error', (err) => {
-          console.error(`[${task_id}] FFmpeg error:`, err);
-          reject(err);
-        })
-        .run();
-    });
+    // Экранируем пути файлов для bash
+    const escapedInputPath = inputVideoPath.replace(/'/g, "'\"'\"'");
+    const escapedSrtPath = srtPath.replace(/'/g, "'\"'\"'");
+    const escapedOutputPath = outputVideoPath.replace(/'/g, "'\"'\"'");
+    const escapedStyle = subtitleStyle.replace(/'/g, "'\"'\"'");
+    
+    const ffmpegCommand = `ffmpeg -i '${escapedInputPath}' -vf "subtitles='${escapedSrtPath}':force_style='${escapedStyle}'" -c:a ${processing_options?.audio_codec || 'copy'} -c:v ${processing_options?.video_codec || 'libx264'} -preset ${processing_options?.preset || 'fast'} -crf ${processing_options?.crf || '23'} -movflags +faststart -y '${escapedOutputPath}'`;
+    
+    await executeFFmpeg(ffmpegCommand, processing_options?.timeout * 1000 || 300000);
 
     // Читаем готовое видео
     const processedVideoBuffer = fs.readFileSync(outputVideoPath);
