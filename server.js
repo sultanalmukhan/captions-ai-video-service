@@ -1,32 +1,22 @@
-// server.js - Video Processing Service для Captions AI
+// Railway Video Processing Service
+// server.js
+
 const express = require('express');
 const multer = require('multer');
-const { execSync } = require('child_process');
+const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
+const { v4: uuidv4 } = require('uuid');
+const fetch = require('node-fetch');
 
 const app = express();
-const port = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '500mb' }));
+app.use(express.urlencoded({ extended: true, limit: '500mb' }));
 
-// CORS для n8n запросов
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  
-  if (req.method === 'OPTIONS') {
-    res.sendStatus(200);
-  } else {
-    next();
-  }
-});
-
-// Настройка multer для обработки файлов
+// Multer для обработки файлов
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadDir = '/tmp/uploads';
@@ -36,248 +26,194 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
-    const uniqueName = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}.mp4`;
-    cb(null, uniqueName);
+    cb(null, `${uuidv4()}_${file.originalname}`);
   }
 });
 
 const upload = multer({ 
-  storage: storage,
-  limits: { 
-    fileSize: 500 * 1024 * 1024, // 500MB
-    fieldSize: 10 * 1024 * 1024   // 10MB для SRT контента
-  }
+  storage,
+  limits: { fileSize: 500 * 1024 * 1024 } // 500MB limit
 });
 
-// Стили субтитров
-const SUBTITLE_STYLES = {
-  default: 'FontSize=24,PrimaryColour=&Hffffff,OutlineColour=&H000000,Outline=2,Alignment=2',
-  bold: 'FontSize=28,PrimaryColour=&Hffffff,OutlineColour=&H000000,Outline=3,Bold=1,Alignment=2',
-  colored: 'FontSize=24,PrimaryColour=&H00ffff,OutlineColour=&H000000,Outline=2,Alignment=2',
-  large: 'FontSize=32,PrimaryColour=&Hffffff,OutlineColour=&H000000,Outline=3,Alignment=2',
-  yellow: 'FontSize=24,PrimaryColour=&H00ffff,OutlineColour=&H000000,Outline=2,Alignment=2'
-};
+// Health check
+app.get('/health', (req, res) => {
+  res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+});
 
-// Основной endpoint для обработки видео
-app.post('/process-video', upload.single('video'), async (req, res) => {
-  console.log('🎬 Starting video processing...');
+// Основной endpoint для обработки видео с субтитрами
+app.post('/process-video', async (req, res) => {
+  const { task_id, video_url, srt_content, style_config, processing_options } = req.body;
   
+  if (!task_id || !srt_content) {
+    return res.status(400).json({
+      error: 'Missing required fields: task_id, srt_content'
+    });
+  }
+
+  if (!video_url) {
+    return res.status(400).json({
+      error: 'Video file is required - provide video_url'
+    });
+  }
+
+  console.log(`[${task_id}] Starting video processing`);
   const startTime = Date.now();
-  let tempFiles = [];
-  
+
   try {
-    // Валидация входных данных
-    const { srt_content, subtitle_style = 'default' } = req.body;
-    const videoFile = req.file;
-    
-    if (!videoFile) {
-      return res.status(400).json({ 
-        error: 'Video file is required',
-        code: 'MISSING_VIDEO'
-      });
+    // Создаем временные пути для файлов
+    const tempDir = '/tmp/processing';
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+
+    const inputVideoPath = path.join(tempDir, `input_${task_id}.mp4`);
+    const srtPath = path.join(tempDir, `subtitles_${task_id}.srt`);
+    const outputVideoPath = path.join(tempDir, `output_${task_id}.mp4`);
+
+    // Скачиваем видео файл
+    console.log(`[${task_id}] Downloading video from: ${video_url}`);
+    const videoResponse = await fetch(video_url);
+    if (!videoResponse.ok) {
+      throw new Error(`Failed to download video: ${videoResponse.statusText}`);
     }
     
-    if (!srt_content) {
-      return res.status(400).json({ 
-        error: 'SRT content is required', 
-        code: 'MISSING_SRT'
-      });
-    }
-    
-    console.log(`📁 Processing video: ${videoFile.filename} (${(videoFile.size / 1024 / 1024).toFixed(2)}MB)`);
-    console.log(`📝 SRT length: ${srt_content.length} characters`);
-    console.log(`🎨 Style: ${subtitle_style}`);
-    
-    // Создаем временные файлы
-    const timestamp = Date.now();
-    const srtPath = path.join('/tmp', `subtitles_${timestamp}.srt`);
-    const outputPath = path.join('/tmp', `output_${timestamp}.mp4`);
-    
-    tempFiles.push(videoFile.path, srtPath, outputPath);
-    
+    const videoBuffer = await videoResponse.buffer();
+    fs.writeFileSync(inputVideoPath, videoBuffer);
+
     // Сохраняем SRT файл
     fs.writeFileSync(srtPath, srt_content, 'utf8');
-    console.log(`💾 SRT file saved: ${srtPath}`);
+
+    // Настройки стиля субтитров
+    const defaultStyle = "Fontsize=24,PrimaryColour=&Hffffff,OutlineColour=&H000000,Outline=2,Shadow=1";
+    const subtitleStyle = style_config?.subtitle_style || defaultStyle;
+
+    // Обрабатываем видео с FFmpeg
+    console.log(`[${task_id}] Starting FFmpeg processing`);
     
-    // Проверяем доступность FFmpeg
-    try {
-      execSync('ffmpeg -version', { stdio: 'pipe' });
-    } catch (error) {
-      throw new Error('FFmpeg not available');
-    }
-    
-    // Получаем стиль субтитров
-    const styleString = SUBTITLE_STYLES[subtitle_style] || SUBTITLE_STYLES.default;
-    
-    // FFmpeg команда для вшивания субтитров
-    const ffmpegCommand = [
-      'ffmpeg',
-      '-i', `"${videoFile.path}"`,
-      '-vf', `"subtitles='${srtPath}':force_style='${styleString}'"`,
-      '-c:a', 'copy',
-      '-y', // перезаписать выходной файл
-      `"${outputPath}"`
-    ].join(' ');
-    
-    console.log(`🔧 FFmpeg command: ${ffmpegCommand}`);
-    
-    // Выполняем FFmpeg с таймаутом
-    const ffmpegStartTime = Date.now();
-    execSync(ffmpegCommand, { 
-      stdio: 'pipe', 
-      timeout: 300000, // 5 минут
-      maxBuffer: 50 * 1024 * 1024 // 50MB буфер
+    await new Promise((resolve, reject) => {
+      ffmpeg(inputVideoPath)
+        .videoFilters([
+          {
+            filter: 'subtitles',
+            options: {
+              filename: srtPath,
+              force_style: subtitleStyle
+            }
+          }
+        ])
+        .videoCodec(processing_options?.video_codec || 'libx264')
+        .audioCodec(processing_options?.audio_codec || 'copy')
+        .addOptions([
+          '-preset', processing_options?.preset || 'fast',
+          '-crf', processing_options?.crf || '23',
+          '-movflags', '+faststart' // Для быстрого старта воспроизведения
+        ])
+        .output(outputVideoPath)
+        .on('start', (cmd) => {
+          console.log(`[${task_id}] FFmpeg command: ${cmd}`);
+        })
+        .on('progress', (progress) => {
+          console.log(`[${task_id}] Processing: ${Math.round(progress.percent)}% done`);
+        })
+        .on('end', () => {
+          console.log(`[${task_id}] FFmpeg processing completed`);
+          resolve();
+        })
+        .on('error', (err) => {
+          console.error(`[${task_id}] FFmpeg error:`, err);
+          reject(err);
+        })
+        .run();
     });
+
+    // Читаем готовое видео
+    const processedVideoBuffer = fs.readFileSync(outputVideoPath);
     
-    const ffmpegTime = Date.now() - ffmpegStartTime;
-    console.log(`✅ FFmpeg completed in ${ffmpegTime}ms`);
-    
-    // Проверяем что выходной файл создался
-    if (!fs.existsSync(outputPath)) {
-      throw new Error('Output video file was not created');
-    }
-    
-    // Читаем результат
-    const processedVideo = fs.readFileSync(outputPath);
-    const outputSizeMB = (processedVideo.length / 1024 / 1024).toFixed(2);
-    
-    console.log(`📊 Output video size: ${outputSizeMB}MB`);
-    
-    // Очистка временных файлов
-    tempFiles.forEach(file => {
-      if (fs.existsSync(file)) {
-        fs.unlinkSync(file);
-      }
-    });
-    
-    const totalTime = Date.now() - startTime;
-    console.log(`🎉 Video processing completed in ${totalTime}ms`);
-    
-    // Отправляем результат
-    res.set({
-      'Content-Type': 'video/mp4',
-      'Content-Disposition': 'attachment; filename="video_with_subtitles.mp4"',
-      'X-Processing-Time': totalTime.toString(),
-      'X-Output-Size': outputSizeMB
-    });
-    
-    res.send(processedVideo);
-    
-  } catch (error) {
-    console.error('❌ Video processing error:', error.message);
-    
-    // Очистка временных файлов в случае ошибки
-    tempFiles.forEach(file => {
-      if (fs.existsSync(file)) {
-        try {
-          fs.unlinkSync(file);
-        } catch (cleanupError) {
-          console.error('Cleanup error:', cleanupError.message);
+    // Получаем статистику файлов
+    const inputStats = fs.statSync(inputVideoPath);
+    const outputStats = fs.statSync(outputVideoPath);
+    const processingTime = Date.now() - startTime;
+
+    // Очищаем временные файлы
+    [inputVideoPath, srtPath, outputVideoPath].forEach(filePath => {
+      try {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
         }
+      } catch (err) {
+        console.warn(`[${task_id}] Failed to delete temp file: ${filePath}`);
       }
     });
+
+    console.log(`[${task_id}] Video processing completed in ${processingTime}ms`);
+
+    // Возвращаем обработанное видео
+    res.json({
+      success: true,
+      task_id: task_id,
+      processing_stats: {
+        processing_time: processingTime,
+        input_size: inputStats.size,
+        output_size: outputStats.size,
+        compression_ratio: (outputStats.size / inputStats.size).toFixed(2)
+      },
+      video_data: processedVideoBuffer.toString('base64'),
+      content_type: 'video/mp4'
+    });
+
+  } catch (error) {
+    console.error(`[${task_id}] Processing error:`, error);
+
+    // Очистка в случае ошибки
+    const tempFiles = [
+      `/tmp/processing/input_${task_id}.mp4`,
+      `/tmp/processing/subtitles_${task_id}.srt`,
+      `/tmp/processing/output_${task_id}.mp4`
+    ];
     
-    // Определяем тип ошибки
-    let errorCode = 'PROCESSING_ERROR';
-    let statusCode = 500;
-    
-    if (error.message.includes('FFmpeg not available')) {
-      errorCode = 'FFMPEG_NOT_FOUND';
-      statusCode = 503;
-    } else if (error.message.includes('timeout')) {
-      errorCode = 'PROCESSING_TIMEOUT';
-      statusCode = 408;
-    } else if (error.message.includes('No space left')) {
-      errorCode = 'INSUFFICIENT_STORAGE';
-      statusCode = 507;
-    }
-    
-    res.status(statusCode).json({ 
-      error: 'Video processing failed', 
-      details: error.message,
-      code: errorCode,
-      timestamp: new Date().toISOString()
+    tempFiles.forEach(filePath => {
+      try {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      } catch (cleanupErr) {
+        console.warn(`Failed to cleanup: ${filePath}`);
+      }
+    });
+
+    res.status(500).json({
+      success: false,
+      task_id: task_id,
+      error: 'Video processing failed',
+      error_details: error.message,
+      processing_time: Date.now() - startTime
     });
   }
 });
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  const health = {
-    status: 'OK',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    memory: process.memoryUsage(),
-    ffmpeg: checkFFmpeg(),
-    disk_space: checkDiskSpace()
-  };
+// Endpoint для проверки статуса задачи (если нужен асинхронный режим)
+app.get('/status/:task_id', (req, res) => {
+  const { task_id } = req.params;
   
-  res.json(health);
-});
-
-// Проверка доступности FFmpeg
-function checkFFmpeg() {
-  try {
-    const output = execSync('ffmpeg -version 2>&1', { encoding: 'utf8' });
-    const version = output.split('\n')[0];
-    return { available: true, version };
-  } catch (error) {
-    return { available: false, error: error.message };
-  }
-}
-
-// Проверка свободного места на диске
-function checkDiskSpace() {
-  try {
-    const output = execSync('df -h /tmp', { encoding: 'utf8' });
-    return output.split('\n')[1].split(/\s+/);
-  } catch (error) {
-    return { error: error.message };
-  }
-}
-
-// Endpoint для получения доступных стилей
-app.get('/styles', (req, res) => {
+  // Здесь можно добавить логику проверки статуса из базы данных
+  // Пока возвращаем простой ответ
   res.json({
-    available_styles: Object.keys(SUBTITLE_STYLES),
-    default_style: 'default'
+    task_id: task_id,
+    status: 'processing',
+    message: 'Use synchronous /process-video endpoint for immediate results'
   });
 });
 
-// 404 handler
-app.use('*', (req, res) => {
-  res.status(404).json({ 
-    error: 'Endpoint not found',
-    available_endpoints: [
-      'POST /process-video',
-      'GET /health',
-      'GET /styles'
-    ]
-  });
-});
-
-// Error handler
+// Error handling middleware
 app.use((error, req, res, next) => {
   console.error('Unhandled error:', error);
-  res.status(500).json({ 
+  res.status(500).json({
     error: 'Internal server error',
-    message: error.message 
+    message: error.message
   });
 });
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('🛑 SIGTERM received, shutting down gracefully');
-  process.exit(0);
-});
-
-process.on('SIGINT', () => {
-  console.log('🛑 SIGINT received, shutting down gracefully');
-  process.exit(0);
-});
-
-app.listen(port, '0.0.0.0', () => {
-  console.log(`🚀 Video Processing Service running on port ${port}`);
-  console.log(`🔧 FFmpeg status:`, checkFFmpeg());
-  console.log(`📁 Upload directory: /tmp/uploads`);
+app.listen(PORT, () => {
+  console.log(`Video Processing Service running on port ${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
