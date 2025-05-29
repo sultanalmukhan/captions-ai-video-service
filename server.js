@@ -42,7 +42,7 @@ app.get('/health', (req, res) => {
 
 // Основной endpoint для обработки видео с субтитрами
 app.post('/process-video', async (req, res) => {
-  const { task_id, video_url, srt_content, style_config, processing_options } = req.body;
+  const { task_id, video_source, video_data, srt_content, style_config, processing_options } = req.body;
   
   if (!task_id || !srt_content) {
     return res.status(400).json({
@@ -50,13 +50,13 @@ app.post('/process-video', async (req, res) => {
     });
   }
 
-  if (!video_url) {
+  if (!video_data) {
     return res.status(400).json({
-      error: 'Video file is required - provide video_url'
+      error: 'Video data is required - provide video_data (URL or base64)'
     });
   }
 
-  console.log(`[${task_id}] Starting video processing`);
+  console.log(`[${task_id}] Starting video processing, source: ${video_source}`);
   const startTime = Date.now();
 
   try {
@@ -70,18 +70,34 @@ app.post('/process-video', async (req, res) => {
     const srtPath = path.join(tempDir, `subtitles_${task_id}.srt`);
     const outputVideoPath = path.join(tempDir, `output_${task_id}.mp4`);
 
-    // Скачиваем видео файл
-    console.log(`[${task_id}] Downloading video from: ${video_url}`);
-    const videoResponse = await fetch(video_url);
-    if (!videoResponse.ok) {
-      throw new Error(`Failed to download video: ${videoResponse.statusText}`);
-    }
+    // Получаем видео файл в зависимости от источника
+    let videoBuffer;
     
-    const videoBuffer = await videoResponse.buffer();
+    if (video_source === 'url') {
+      // Скачиваем видео по URL
+      console.log(`[${task_id}] Downloading video from URL`);
+      const videoResponse = await fetch(video_data);
+      if (!videoResponse.ok) {
+        throw new Error(`Failed to download video: ${videoResponse.statusText}`);
+      }
+      videoBuffer = await videoResponse.buffer();
+    } 
+    else if (video_source === 'binary') {
+      // Декодируем base64
+      console.log(`[${task_id}] Decoding base64 video data`);
+      videoBuffer = Buffer.from(video_data, 'base64');
+    } 
+    else {
+      throw new Error(`Unknown video_source: ${video_source}`);
+    }
+
+    // Сохраняем видео файл
     fs.writeFileSync(inputVideoPath, videoBuffer);
+    console.log(`[${task_id}] Video file saved, size: ${videoBuffer.length} bytes`);
 
     // Сохраняем SRT файл
     fs.writeFileSync(srtPath, srt_content, 'utf8');
+    console.log(`[${task_id}] SRT file saved, size: ${srt_content.length} chars`);
 
     // Настройки стиля субтитров
     const defaultStyle = "Fontsize=24,PrimaryColour=&Hffffff,OutlineColour=&H000000,Outline=2,Shadow=1";
