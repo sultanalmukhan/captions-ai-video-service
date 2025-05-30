@@ -1,5 +1,5 @@
-// Test Railway Video Processing Service
-// server.js - с тестовыми субтитрами на ВСЁ видео
+// Railway Diagnostic Service
+// server.js - диагностика и альтернативные методы встроенных субтитров
 
 const express = require('express');
 const multer = require('multer');
@@ -35,92 +35,48 @@ const upload = multer({
   }
 });
 
-// Health check
+// Enhanced health check
 app.get('/health', (req, res) => {
+  const ffmpegInfo = getFFmpegInfo();
   res.json({ 
     status: 'healthy', 
     timestamp: new Date().toISOString(),
-    ffmpeg_available: checkFFmpeg()
+    ffmpeg_available: ffmpegInfo.available,
+    ffmpeg_version: ffmpegInfo.version,
+    ffmpeg_filters: ffmpegInfo.filters,
+    system_info: getSystemInfo()
   });
 });
 
-function checkFFmpeg() {
+function getFFmpegInfo() {
   try {
-    execSync('ffmpeg -version', { stdio: 'pipe' });
-    return true;
+    const versionOutput = execSync('ffmpeg -version', { encoding: 'utf8' });
+    const filtersOutput = execSync('ffmpeg -filters 2>/dev/null | grep -E "(subtitles|drawtext|ass)"', { encoding: 'utf8' });
+    
+    return {
+      available: true,
+      version: versionOutput.split('\n')[0],
+      filters: filtersOutput.split('\n').filter(line => line.trim())
+    };
   } catch (error) {
-    return false;
+    return { available: false, error: error.message };
   }
 }
 
-// Получение длительности видео
-function getVideoDuration(videoPath, taskId) {
+function getSystemInfo() {
   try {
-    console.log(`[${taskId}] Getting video duration...`);
-    const output = execSync(`ffprobe -v quiet -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`, { encoding: 'utf8' });
-    const duration = parseFloat(output.trim());
-    console.log(`[${taskId}] Video duration: ${duration} seconds`);
-    return duration;
+    const osInfo = execSync('cat /etc/os-release', { encoding: 'utf8' });
+    return osInfo.split('\n')[0];
   } catch (error) {
-    console.log(`[${taskId}] Failed to get duration, using default 60s`);
-    return 60; // Default 60 seconds if detection fails
+    return 'Unknown OS';
   }
-}
-
-// Создание тестовых субтитров на всю длину видео
-function createFullLengthTestSRT(videoDuration, taskId) {
-  console.log(`[${taskId}] Creating test SRT for ${videoDuration} seconds`);
-  
-  const testTexts = [
-    "🎯 ТЕСТ СУБТИТРОВ - ВИДИТЕ ЛИ ВЫ ЭТОТ ТЕКСТ?",
-    "📺 ЭТО ТЕСТОВЫЕ СУБТИТРЫ ОТ CAPTIONS AI",
-    "⭐ ЕСЛИ ВЫ ВИДИТЕ ЭТОТ ТЕКСТ - СУБТИТРЫ РАБОТАЮТ!",
-    "🚀 АВТОМАТИЧЕСКИЕ СУБТИТРЫ УСПЕШНО ДОБАВЛЕНЫ",
-    "✅ СИСТЕМА ОБРАБОТКИ ВИДЕО ФУНКЦИОНИРУЕТ"
-  ];
-  
-  let srtContent = '';
-  let subtitleIndex = 1;
-  const intervalSeconds = 5; // Каждые 5 секунд новый субтитр
-  
-  for (let startTime = 0; startTime < videoDuration; startTime += intervalSeconds) {
-    const endTime = Math.min(startTime + intervalSeconds, videoDuration);
-    
-    // Форматируем время в SRT формат
-    const startSRT = formatTimeToSRT(startTime);
-    const endSRT = formatTimeToSRT(endTime);
-    
-    // Выбираем текст циклично
-    const text = testTexts[(subtitleIndex - 1) % testTexts.length];
-    
-    srtContent += `${subtitleIndex}\n`;
-    srtContent += `${startSRT} --> ${endSRT}\n`;
-    srtContent += `${text}\n\n`;
-    
-    subtitleIndex++;
-  }
-  
-  console.log(`[${taskId}] Created ${subtitleIndex - 1} test subtitles`);
-  console.log(`[${taskId}] Test SRT preview:`, srtContent.substring(0, 300));
-  
-  return srtContent;
-}
-
-// Форматирование времени в SRT формат
-function formatTimeToSRT(seconds) {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = Math.floor(seconds % 60);
-  const ms = Math.floor((seconds % 1) * 1000);
-  
-  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`;
 }
 
 app.post('/process-video-with-subtitles', upload.single('video'), async (req, res) => {
   const taskId = req.body.task_id || uuidv4();
   const startTime = Date.now();
   
-  console.log(`\n=== [${taskId}] TEST VIDEO PROCESSING WITH FULL-LENGTH SUBTITLES ===`);
+  console.log(`\n=== [${taskId}] DIAGNOSTIC VIDEO PROCESSING ===`);
 
   try {
     if (!req.file) {
@@ -134,6 +90,12 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
     const videoBuffer = req.file.buffer;
     console.log(`[${taskId}] Video size: ${videoBuffer.length} bytes`);
 
+    // Диагностика системы
+    console.log(`[${taskId}] System diagnostic:`);
+    const ffmpegInfo = getFFmpegInfo();
+    console.log(`[${taskId}] FFmpeg version:`, ffmpegInfo.version);
+    console.log(`[${taskId}] Available filters:`, ffmpegInfo.filters);
+
     // Создаем временные файлы
     const tempDir = '/tmp/processing';
     if (!fs.existsSync(tempDir)) {
@@ -141,105 +103,133 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
     }
 
     const inputVideoPath = path.join(tempDir, `input_${taskId}.mp4`);
-    const srtPath = path.join(tempDir, `test_subtitles_${taskId}.srt`);
     const outputVideoPath = path.join(tempDir, `output_${taskId}.mp4`);
 
     // Сохраняем видео
     fs.writeFileSync(inputVideoPath, videoBuffer);
-    console.log(`[${taskId}] Video saved to: ${inputVideoPath}`);
 
-    // Получаем длительность видео
-    const videoDuration = getVideoDuration(inputVideoPath, taskId);
-
-    // Создаем тестовые субтитры на всю длину видео
-    const testSRT = createFullLengthTestSRT(videoDuration, taskId);
-    fs.writeFileSync(srtPath, testSRT, 'utf8');
+    // ТЕСТ 1: Простой drawtext без файлов
+    console.log(`[${taskId}] 🧪 TEST 1: Simple drawtext (no external files)`);
     
-    console.log(`[${taskId}] Test SRT saved to: ${srtPath}`);
-    console.log(`[${taskId}] SRT file size: ${fs.statSync(srtPath).size} bytes`);
-
-    // Множественные варианты FFmpeg команд для максимальной видимости
-    const commands = [
-      // Команда 1: Большие красные субтитры по центру
-      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='Fontsize=40,PrimaryColour=&H0000ff,OutlineColour=&Hffffff,Outline=3,Shadow=2,Bold=1,Alignment=2'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
+    const drawTextCommands = [
+      // Базовый drawtext
+      `ffmpeg -i "${inputVideoPath}" -vf "drawtext=text='ТЕСТ 1 - ПРОСТОЙ DRAWTEXT':fontsize=36:fontcolor=red:x=50:y=50" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
       
-      // Команда 2: Желтые субтитры с черным фоном
-      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='Fontsize=36,PrimaryColour=&H00ffff,BackColour=&H80000000,Outline=2,Bold=1'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
+      // Drawtext с фоном
+      `ffmpeg -i "${inputVideoPath}" -vf "drawtext=text='ТЕСТ 2 - ТЕКСТ С ФОНОМ':fontsize=32:fontcolor=white:x=(w-text_w)/2:y=h-100:box=1:boxcolor=black:boxborderw=10" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
       
-      // Команда 3: Простой drawtext с фиксированным текстом (гарантированно видимый)
-      `ffmpeg -i "${inputVideoPath}" -vf "drawtext=text='🎯 CAPTIONS AI ТЕСТ - СУБТИТРЫ РАБОТАЮТ! 🎯':fontsize=36:fontcolor=red:x=(w-text_w)/2:y=h-100:box=1:boxcolor=white:boxborderw=10" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
+      // Множественный drawtext
+      `ffmpeg -i "${inputVideoPath}" -vf "drawtext=text='ТЕСТ 3 - ВЕРХ':fontsize=28:fontcolor=yellow:x=(w-text_w)/2:y=50,drawtext=text='ТЕСТ 3 - НИЗ':fontsize=28:fontcolor=lime:x=(w-text_w)/2:y=h-50" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
       
-      // Команда 4: Белые субтитры с толстой черной обводкой
-      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='Fontsize=32,PrimaryColour=&Hffffff,OutlineColour=&H000000,Outline=4,Shadow=3'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`
+      // Мигающий текст (изменяется каждую секунду)
+      `ffmpeg -i "${inputVideoPath}" -vf "drawtext=text='МИГАЮЩИЙ ТЕСТ %{pts\\:hms}':fontsize=40:fontcolor=red:x=(w-text_w)/2:y=(h-text_h)/2:box=1:boxcolor=white" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`
     ];
 
     let success = false;
-    let usedCommand = 0;
-    let lastError = null;
-    
-    for (let i = 0; i < commands.length && !success; i++) {
+    let usedMethod = '';
+    let diagnosticResults = [];
+
+    // Пробуем каждый drawtext метод
+    for (let i = 0; i < drawTextCommands.length && !success; i++) {
       try {
-        console.log(`[${taskId}] 🎬 TRYING COMMAND ${i + 1} 🎬`);
-        console.log(`[${taskId}] Command: ${commands[i]}`);
+        console.log(`[${taskId}] Trying drawtext method ${i + 1}...`);
+        console.log(`[${taskId}] Command: ${drawTextCommands[i]}`);
         
         // Удаляем предыдущий файл
         if (fs.existsSync(outputVideoPath)) {
           fs.unlinkSync(outputVideoPath);
         }
         
-        // Выполняем команду
-        const result = execSync(commands[i], { 
+        const startCmdTime = Date.now();
+        execSync(drawTextCommands[i], { 
           stdio: 'pipe',
           timeout: 300000,
           maxBuffer: 1024 * 1024 * 100
         });
-        
-        console.log(`[${taskId}] FFmpeg completed for command ${i + 1}`);
+        const cmdDuration = Date.now() - startCmdTime;
         
         // Проверяем результат
         if (fs.existsSync(outputVideoPath)) {
           const outputSize = fs.statSync(outputVideoPath).size;
+          const compressionRatio = (outputSize / videoBuffer.length).toFixed(3);
+          
           if (outputSize > 0) {
-            console.log(`[${taskId}] ✅ SUCCESS! Command ${i + 1} worked! Output: ${outputSize} bytes`);
-            success = true;
-            usedCommand = i + 1;
+            console.log(`[${taskId}] ✅ Drawtext method ${i + 1} SUCCESS!`);
+            console.log(`[${taskId}] - Processing time: ${cmdDuration}ms`);
+            console.log(`[${taskId}] - Output size: ${outputSize} bytes`);
+            console.log(`[${taskId}] - Compression ratio: ${compressionRatio}`);
             
-            // Особо отмечаем команду 3 (drawtext)
-            if (i === 2) {
-              console.log(`[${taskId}] 🔥 USED DRAWTEXT COMMAND - SUBTITLES ARE DEFINITELY VISIBLE! 🔥`);
-            }
+            success = true;
+            usedMethod = `DRAWTEXT_METHOD_${i + 1}`;
+            
+            diagnosticResults.push({
+              method: i + 1,
+              success: true,
+              duration_ms: cmdDuration,
+              output_size: outputSize,
+              compression_ratio: compressionRatio
+            });
             
             break;
           } else {
-            console.log(`[${taskId}] ❌ Command ${i + 1} created empty file`);
+            diagnosticResults.push({
+              method: i + 1,
+              success: false,
+              error: 'Empty output file'
+            });
           }
         } else {
-          console.log(`[${taskId}] ❌ Command ${i + 1} didn't create output file`);
+          diagnosticResults.push({
+            method: i + 1,
+            success: false,
+            error: 'No output file created'
+          });
         }
         
       } catch (error) {
-        console.log(`[${taskId}] ❌ Command ${i + 1} failed:`, error.message);
-        lastError = error;
+        console.log(`[${taskId}] ❌ Drawtext method ${i + 1} failed:`, error.message);
+        diagnosticResults.push({
+          method: i + 1,
+          success: false,
+          error: error.message
+        });
       }
     }
 
     if (!success) {
-      throw new Error(`All commands failed. Last error: ${lastError?.message || 'Unknown'}`);
+      // ТЕСТ 2: Проверяем основные кодеки
+      console.log(`[${taskId}] 🧪 TEST 2: Basic video reencoding (no text)`);
+      
+      try {
+        const basicCommand = `ffmpeg -i "${inputVideoPath}" -c:v libx264 -preset fast -crf 23 -c:a copy -y "${outputVideoPath}"`;
+        console.log(`[${taskId}] Basic reencoding command: ${basicCommand}`);
+        
+        execSync(basicCommand, { stdio: 'pipe', timeout: 300000 });
+        
+        if (fs.existsSync(outputVideoPath) && fs.statSync(outputVideoPath).size > 0) {
+          console.log(`[${taskId}] ✅ Basic reencoding works - FFmpeg is functional`);
+          success = true;
+          usedMethod = 'BASIC_REENCODING_ONLY';
+        }
+      } catch (error) {
+        console.log(`[${taskId}] ❌ Even basic reencoding failed:`, error.message);
+      }
+    }
+
+    if (!success) {
+      throw new Error('All methods failed - FFmpeg may not be working properly');
     }
 
     // Читаем результат
     const processedVideoBuffer = fs.readFileSync(outputVideoPath);
     const processingTime = Date.now() - startTime;
 
-    console.log(`[${taskId}] 🎉 FINAL SUCCESS! 🎉`);
-    console.log(`[${taskId}] Used command: ${usedCommand}`);
-    console.log(`[${taskId}] Processing time: ${processingTime}ms`);
-    console.log(`[${taskId}] Input size: ${videoBuffer.length} bytes`);
-    console.log(`[${taskId}] Output size: ${processedVideoBuffer.length} bytes`);
-    console.log(`[${taskId}] Video duration: ${videoDuration} seconds`);
+    console.log(`[${taskId}] 🎉 DIAGNOSTIC COMPLETE! 🎉`);
+    console.log(`[${taskId}] Used method: ${usedMethod}`);
+    console.log(`[${taskId}] Total processing time: ${processingTime}ms`);
 
     // Очистка
-    [inputVideoPath, srtPath, outputVideoPath].forEach(filePath => {
+    [inputVideoPath, outputVideoPath].forEach(filePath => {
       try {
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
       } catch (err) {
@@ -255,27 +245,24 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
         input_size_bytes: videoBuffer.length,
         output_size_bytes: processedVideoBuffer.length,
         compression_ratio: (processedVideoBuffer.length / videoBuffer.length).toFixed(2),
-        video_duration_seconds: videoDuration,
-        ffmpeg_command_used: usedCommand,
-        subtitle_method: usedCommand === 3 ? 'DRAWTEXT_GUARANTEED_VISIBLE' : 'SUBTITLES_FILTER'
+        method_used: usedMethod
       },
       video_data: processedVideoBuffer.toString('base64'),
       content_type: 'video/mp4',
-      test_info: {
-        full_length_subtitles: true,
-        subtitle_intervals: '5 seconds',
-        guaranteed_visible: usedCommand === 3,
-        test_message: usedCommand === 3 ? 'RED TEXT WITH WHITE BACKGROUND' : 'STYLED SUBTITLES'
+      diagnostic_info: {
+        ffmpeg_version: ffmpegInfo.version,
+        available_filters: ffmpegInfo.filters,
+        method_results: diagnosticResults,
+        subtitle_status: usedMethod.includes('DRAWTEXT') ? 'GUARANTEED_VISIBLE' : 'NO_TEXT_ADDED'
       }
     });
 
   } catch (error) {
-    console.error(`[${taskId}] 💥 FATAL ERROR:`, error.message);
+    console.error(`[${taskId}] 💥 DIAGNOSTIC ERROR:`, error.message);
 
     // Очистка при ошибке
     const tempFiles = [
       `/tmp/processing/input_${taskId}.mp4`,
-      `/tmp/processing/test_subtitles_${taskId}.srt`,
       `/tmp/processing/output_${taskId}.mp4`
     ];
     
@@ -297,7 +284,7 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
 });
 
 app.listen(PORT, () => {
-  console.log(`Test Video Processing Service running on port ${PORT}`);
-  console.log(`FFmpeg available: ${checkFFmpeg()}`);
-  console.log(`Ready to add FULL-LENGTH test subtitles!`);
+  console.log(`Diagnostic Video Processing Service running on port ${PORT}`);
+  console.log(`System info:`, getSystemInfo());
+  console.log(`FFmpeg info:`, getFFmpegInfo());
 });
