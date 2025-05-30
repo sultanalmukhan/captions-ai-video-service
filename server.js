@@ -77,7 +77,7 @@ function getSystemInfo() {
         '/usr/share/fonts/',
         '/usr/share/fonts/dejavu/',
         '/usr/share/fonts/liberation/',
-        '/usr/share/fonts/ubuntu/'
+        '/usr/share/fonts/noto/'
       ]
     };
   } catch (error) {
@@ -219,8 +219,8 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
             const descriptions = [
               'DRAWTEXT_DEJAVU_FONT',
               'DRAWTEXT_LIBERATION_FONT', 
+              'DRAWTEXT_NOTO_FONT',
               'SUBTITLES_WITH_FORCED_FONT',
-              'BASIC_DRAWTEXT',
               'SIMPLE_SUBTITLES'
             ];
             methodDescription = descriptions[i];
@@ -272,7 +272,7 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
       subtitle_info: {
         fonts_fixed: true,
         method: methodDescription,
-        guaranteed_visible: usedCommand <= 2 // drawtext методы
+        guaranteed_visible: usedCommand <= 3 // drawtext методы
       }
     });
 
