@@ -1,13 +1,12 @@
-// Railway Video Processing Service
-// server.js
+// Railway Direct Video Processing Service
+// server.js - принимает запросы напрямую от iOS
 
 const express = require('express');
 const multer = require('multer');
-const { execSync, spawn } = require('child_process');
+const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
-const fetch = require('node-fetch');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -16,242 +15,224 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json({ limit: '500mb' }));
 app.use(express.urlencoded({ extended: true, limit: '500mb' }));
 
-// Multer для обработки файлов
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = '/tmp/uploads';
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${uuidv4()}_${file.originalname}`);
+// CORS для iOS приложения
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+  } else {
+    next();
   }
 });
 
-const upload = multer({ 
-  storage,
-  limits: { fileSize: 500 * 1024 * 1024 } // 500MB limit
+// Multer для обработки multipart/form-data от iOS
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { 
+    fileSize: 500 * 1024 * 1024, // 500MB
+    fieldSize: 50 * 1024 * 1024   // 50MB для SRT в поле формы
+  }
 });
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+  res.json({ 
+    status: 'healthy', 
+    timestamp: new Date().toISOString(),
+    ffmpeg_available: checkFFmpeg()
+  });
 });
 
-// Функция для выполнения FFmpeg команд
-function executeFFmpeg(command, timeout = 300000) {
-  return new Promise((resolve, reject) => {
-    console.log('Executing FFmpeg command:', command);
-    
-    const process = spawn('sh', ['-c', command], {
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-    
-    let stdout = '';
-    let stderr = '';
-    
-    process.stdout.on('data', (data) => {
-      stdout += data.toString();
-    });
-    
-    process.stderr.on('data', (data) => {
-      stderr += data.toString();
-      // FFmpeg выводит прогресс в stderr
-      if (data.toString().includes('time=')) {
-        console.log('FFmpeg progress:', data.toString().trim());
-      }
-    });
-    
-    process.on('close', (code) => {
-      if (code === 0) {
-        resolve({ stdout, stderr });
-      } else {
-        reject(new Error(`FFmpeg process exited with code ${code}\nStderr: ${stderr}`));
-      }
-    });
-    
-    process.on('error', (error) => {
-      reject(error);
-    });
-    
-    // Timeout
-    const timer = setTimeout(() => {
-      process.kill('SIGKILL');
-      reject(new Error('FFmpeg process timed out'));
-    }, timeout);
-    
-    process.on('close', () => {
-      clearTimeout(timer);
-    });
-  });
+// Проверка FFmpeg
+function checkFFmpeg() {
+  try {
+    execSync('ffmpeg -version', { stdio: 'pipe' });
+    return true;
+  } catch (error) {
+    return false;
+  }
 }
 
-// Основной endpoint для обработки видео с субтитрами
-app.post('/process-video', async (req, res) => {
-  const { task_id, video_source, video_data, srt_content, style_config, processing_options } = req.body;
-  
-  if (!task_id || !srt_content) {
-    return res.status(400).json({
-      error: 'Missing required fields: task_id, srt_content'
-    });
-  }
-
-  if (!video_data) {
-    return res.status(400).json({
-      error: 'Video data is required - provide video_data (URL or base64)'
-    });
-  }
-
-  console.log(`[${task_id}] Starting video processing, source: ${video_source}`);
+// Основной endpoint для iOS - принимает видео файл + SRT
+app.post('/process-video-with-subtitles', upload.single('video'), async (req, res) => {
+  const taskId = req.body.task_id || uuidv4();
   const startTime = Date.now();
+  
+  console.log(`[${taskId}] Received video processing request from iOS`);
+  console.log(`[${taskId}] Request body keys:`, Object.keys(req.body));
+  console.log(`[${taskId}] Has video file:`, !!req.file);
 
   try {
-    // Создаем временные пути для файлов
+    // Валидация входных данных
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'Video file is required',
+        task_id: taskId
+      });
+    }
+
+    if (!req.body.srt_content) {
+      return res.status(400).json({
+        success: false,
+        error: 'SRT content is required',
+        task_id: taskId
+      });
+    }
+
+    // Получаем данные
+    const videoBuffer = req.file.buffer;
+    const srtContent = req.body.srt_content;
+    const userSettings = JSON.parse(req.body.user_settings || '{}');
+    
+    console.log(`[${taskId}] Video size: ${videoBuffer.length} bytes`);
+    console.log(`[${taskId}] SRT length: ${srtContent.length} chars`);
+    console.log(`[${taskId}] User settings:`, userSettings);
+
+    // Создаём временные файлы
     const tempDir = '/tmp/processing';
     if (!fs.existsSync(tempDir)) {
       fs.mkdirSync(tempDir, { recursive: true });
     }
 
-    const inputVideoPath = path.join(tempDir, `input_${task_id}.mp4`);
-    const srtPath = path.join(tempDir, `subtitles_${task_id}.srt`);
-    const outputVideoPath = path.join(tempDir, `output_${task_id}.mp4`);
+    const inputVideoPath = path.join(tempDir, `input_${taskId}.mp4`);
+    const srtPath = path.join(tempDir, `subtitles_${taskId}.srt`);
+    const outputVideoPath = path.join(tempDir, `output_${taskId}.mp4`);
 
-    // Получаем видео файл в зависимости от источника
-    let videoBuffer;
-    
-    if (video_source === 'url') {
-      // Скачиваем видео по URL
-      console.log(`[${task_id}] Downloading video from URL`);
-      const videoResponse = await fetch(video_data);
-      if (!videoResponse.ok) {
-        throw new Error(`Failed to download video: ${videoResponse.statusText}`);
-      }
-      videoBuffer = await videoResponse.buffer();
-    } 
-    else if (video_source === 'binary') {
-      // Декодируем base64
-      console.log(`[${task_id}] Decoding base64 video data`);
-      videoBuffer = Buffer.from(video_data, 'base64');
-    } 
-    else {
-      throw new Error(`Unknown video_source: ${video_source}`);
-    }
-
-    // Сохраняем видео файл
+    // Сохраняем файлы
     fs.writeFileSync(inputVideoPath, videoBuffer);
-    console.log(`[${task_id}] Video file saved, size: ${videoBuffer.length} bytes`);
+    fs.writeFileSync(srtPath, srtContent, 'utf8');
 
-    // Сохраняем SRT файл
-    fs.writeFileSync(srtPath, srt_content, 'utf8');
-    console.log(`[${task_id}] SRT file saved, size: ${srt_content.length} chars`);
+    console.log(`[${taskId}] Files saved, starting FFmpeg processing`);
 
     // Настройки стиля субтитров
-    const defaultStyle = "Fontsize=24,PrimaryColour=&Hffffff,OutlineColour=&H000000,Outline=2,Shadow=1";
-    const subtitleStyle = style_config?.subtitle_style || defaultStyle;
+    const subtitleStyles = {
+      default: "Fontsize=24,PrimaryColour=&Hffffff,OutlineColour=&H000000,Outline=2,Shadow=1",
+      pro: "Fontsize=28,PrimaryColour=&Hffffff,OutlineColour=&H000000,Outline=3,Bold=1,Shadow=2",
+      premium: "Fontsize=32,PrimaryColour=&H00ffff,OutlineColour=&H000000,Outline=3,Bold=1,Shadow=2,BackColour=&H80000000"
+    };
 
-    // Обрабатываем видео с FFmpeg напрямую
-    console.log(`[${task_id}] Starting FFmpeg processing`);
-    
-    // Экранируем пути файлов для bash
-    const escapedInputPath = inputVideoPath.replace(/'/g, "'\"'\"'");
-    const escapedSrtPath = srtPath.replace(/'/g, "'\"'\"'");
-    const escapedOutputPath = outputVideoPath.replace(/'/g, "'\"'\"'");
-    const escapedStyle = subtitleStyle.replace(/'/g, "'\"'\"'");
-    
-    const ffmpegCommand = `ffmpeg -i '${escapedInputPath}' -vf "subtitles='${escapedSrtPath}':force_style='${escapedStyle}'" -c:a ${processing_options?.audio_codec || 'copy'} -c:v ${processing_options?.video_codec || 'libx264'} -preset ${processing_options?.preset || 'fast'} -crf ${processing_options?.crf || '23'} -movflags +faststart -y '${escapedOutputPath}'`;
-    
-    await executeFFmpeg(ffmpegCommand, processing_options?.timeout * 1000 || 300000);
+    const selectedStyle = subtitleStyles[userSettings.subscription_tier] || subtitleStyles.default;
 
-    // Читаем готовое видео
+    // FFmpeg команда
+    const ffmpegCmd = `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${selectedStyle}'" -c:a copy -c:v libx264 -preset fast -crf 23 -movflags +faststart -y "${outputVideoPath}"`;
+    
+    console.log(`[${taskId}] Executing FFmpeg...`);
+    
+    // Выполняем FFmpeg
+    try {
+      execSync(ffmpegCmd, { 
+        stdio: 'pipe',
+        timeout: 300000, // 5 минут
+        maxBuffer: 1024 * 1024 * 100 // 100MB buffer
+      });
+    } catch (ffmpegError) {
+      console.error(`[${taskId}] FFmpeg error:`, ffmpegError.message);
+      throw new Error(`Video processing failed: ${ffmpegError.message}`);
+    }
+
+    // Проверяем результат
+    if (!fs.existsSync(outputVideoPath)) {
+      throw new Error('Processed video file was not created');
+    }
+
     const processedVideoBuffer = fs.readFileSync(outputVideoPath);
-    
-    // Получаем статистику файлов
-    const inputStats = fs.statSync(inputVideoPath);
-    const outputStats = fs.statSync(outputVideoPath);
     const processingTime = Date.now() - startTime;
 
-    // Очищаем временные файлы
+    console.log(`[${taskId}] Processing completed in ${processingTime}ms`);
+    console.log(`[${taskId}] Output size: ${processedVideoBuffer.length} bytes`);
+
+    // Очистка временных файлов
     [inputVideoPath, srtPath, outputVideoPath].forEach(filePath => {
       try {
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
-        }
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
       } catch (err) {
-        console.warn(`[${task_id}] Failed to delete temp file: ${filePath}`);
+        console.warn(`Failed to delete: ${filePath}`);
       }
     });
 
-    console.log(`[${task_id}] Video processing completed in ${processingTime}ms`);
-
-    // Возвращаем обработанное видео
+    // Возвращаем результат iOS приложению
     res.json({
       success: true,
-      task_id: task_id,
+      task_id: taskId,
       processing_stats: {
-        processing_time: processingTime,
-        input_size: inputStats.size,
-        output_size: outputStats.size,
-        compression_ratio: (outputStats.size / inputStats.size).toFixed(2)
+        processing_time_ms: processingTime,
+        input_size_bytes: videoBuffer.length,
+        output_size_bytes: processedVideoBuffer.length,
+        compression_ratio: (processedVideoBuffer.length / videoBuffer.length).toFixed(2)
       },
+      // Возвращаем видео как base64 (или можно сохранить в хранилище и вернуть URL)
       video_data: processedVideoBuffer.toString('base64'),
-      content_type: 'video/mp4'
+      content_type: 'video/mp4',
+      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 часа
     });
 
   } catch (error) {
-    console.error(`[${task_id}] Processing error:`, error);
+    console.error(`[${taskId}] Processing error:`, error.message);
 
-    // Очистка в случае ошибки
+    // Очистка при ошибке
     const tempFiles = [
-      `/tmp/processing/input_${task_id}.mp4`,
-      `/tmp/processing/subtitles_${task_id}.srt`,
-      `/tmp/processing/output_${task_id}.mp4`
+      `/tmp/processing/input_${taskId}.mp4`,
+      `/tmp/processing/subtitles_${taskId}.srt`,
+      `/tmp/processing/output_${taskId}.mp4`
     ];
     
     tempFiles.forEach(filePath => {
       try {
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
-        }
-      } catch (cleanupErr) {
-        console.warn(`Failed to cleanup: ${filePath}`);
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      } catch (err) {
+        // Игнорируем ошибки очистки
       }
     });
 
     res.status(500).json({
       success: false,
-      task_id: task_id,
-      error: 'Video processing failed',
-      error_details: error.message,
-      processing_time: Date.now() - startTime
+      task_id: taskId,
+      error: error.message,
+      processing_time_ms: Date.now() - startTime
     });
   }
 });
 
-// Endpoint для проверки статуса задачи (если нужен асинхронный режим)
-app.get('/status/:task_id', (req, res) => {
-  const { task_id } = req.params;
+// Альтернативный endpoint с URL вместо файла (если нужно)
+app.post('/process-video-url', async (req, res) => {
+  const { task_id, video_url, srt_content, user_settings } = req.body;
   
-  // Здесь можно добавить логику проверки статуса из базы данных
-  // Пока возвращаем простой ответ
-  res.json({
-    task_id: task_id,
-    status: 'processing',
-    message: 'Use synchronous /process-video endpoint for immediate results'
-  });
-});
+  console.log(`[${task_id}] Processing video from URL:`, video_url);
 
-// Error handling middleware
-app.use((error, req, res, next) => {
-  console.error('Unhandled error:', error);
-  res.status(500).json({
-    error: 'Internal server error',
-    message: error.message
-  });
+  try {
+    // Скачиваем видео
+    const fetch = require('node-fetch');
+    const response = await fetch(video_url);
+    if (!response.ok) {
+      throw new Error(`Failed to download video: ${response.statusText}`);
+    }
+    const videoBuffer = await response.buffer();
+
+    // Создаём новый запрос как будто пришёл файл
+    const mockReq = {
+      body: { task_id, srt_content, user_settings: JSON.stringify(user_settings || {}) },
+      file: { buffer: videoBuffer }
+    };
+
+    // Используем ту же логику обработки
+    // (можно вынести в отдельную функцию для переиспользования)
+    
+    res.json({ success: true, message: 'URL processing not implemented yet' });
+    
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      task_id
+    });
+  }
 });
 
 app.listen(PORT, () => {
-  console.log(`Video Processing Service running on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`Direct Video Processing Service running on port ${PORT}`);
+  console.log(`FFmpeg available: ${checkFFmpeg()}`);
+  console.log('Ready to receive requests from iOS app');
 });
