@@ -10,7 +10,7 @@ RUN apk add --no-cache \
     fontconfig \
     ttf-dejavu \
     ttf-liberation \
-    ttf-ubuntu-font-family \
+    font-noto \
     && rm -rf /var/cache/apk/*
 
 # Обновляем кэш шрифтов
