@@ -19,11 +19,11 @@ RUN fc-cache -f -v
 # Создаем рабочую директорию
 WORKDIR /app
 
-# Копируем package files
-COPY package*.json ./
+# Копируем package.json
+COPY package.json ./
 
-# Устанавливаем npm dependencies
-RUN npm ci --only=production && npm cache clean --force
+# Устанавливаем зависимости (используем npm install вместо npm ci)
+RUN npm install --only=production && npm cache clean --force
 
 # Копируем исходный код
 COPY . .
