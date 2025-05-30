@@ -1,5 +1,5 @@
-// Debug Railway Video Processing Service
-// server.js - с принудительно видимыми субтитрами
+// Test Railway Video Processing Service
+// server.js - с тестовыми субтитрами на ВСЁ видео
 
 const express = require('express');
 const multer = require('multer');
@@ -53,73 +53,86 @@ function checkFFmpeg() {
   }
 }
 
-// Простая функция создания очень заметных субтитров
-function createVisibleSRT(originalSRT, taskId) {
-  console.log(`[${taskId}] Creating highly visible SRT...`);
+// Получение длительности видео
+function getVideoDuration(videoPath, taskId) {
+  try {
+    console.log(`[${taskId}] Getting video duration...`);
+    const output = execSync(`ffprobe -v quiet -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`, { encoding: 'utf8' });
+    const duration = parseFloat(output.trim());
+    console.log(`[${taskId}] Video duration: ${duration} seconds`);
+    return duration;
+  } catch (error) {
+    console.log(`[${taskId}] Failed to get duration, using default 60s`);
+    return 60; // Default 60 seconds if detection fails
+  }
+}
+
+// Создание тестовых субтитров на всю длину видео
+function createFullLengthTestSRT(videoDuration, taskId) {
+  console.log(`[${taskId}] Creating test SRT for ${videoDuration} seconds`);
   
-  // Парсим оригинальный SRT и делаем субтитры ОЧЕНЬ заметными
-  const lines = originalSRT.split('\n');
-  let result = [];
-  let subtitleNum = 1;
+  const testTexts = [
+    "🎯 ТЕСТ СУБТИТРОВ - ВИДИТЕ ЛИ ВЫ ЭТОТ ТЕКСТ?",
+    "📺 ЭТО ТЕСТОВЫЕ СУБТИТРЫ ОТ CAPTIONS AI",
+    "⭐ ЕСЛИ ВЫ ВИДИТЕ ЭТОТ ТЕКСТ - СУБТИТРЫ РАБОТАЮТ!",
+    "🚀 АВТОМАТИЧЕСКИЕ СУБТИТРЫ УСПЕШНО ДОБАВЛЕНЫ",
+    "✅ СИСТЕМА ОБРАБОТКИ ВИДЕО ФУНКЦИОНИРУЕТ"
+  ];
   
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
+  let srtContent = '';
+  let subtitleIndex = 1;
+  const intervalSeconds = 5; // Каждые 5 секунд новый субтитр
+  
+  for (let startTime = 0; startTime < videoDuration; startTime += intervalSeconds) {
+    const endTime = Math.min(startTime + intervalSeconds, videoDuration);
     
-    if (line.includes('-->')) {
-      // Добавляем номер
-      result.push(subtitleNum.toString());
-      
-      // Добавляем время (оставляем как есть)
-      result.push(line);
-      
-      // Ищем текст
-      i++;
-      let text = '';
-      while (i < lines.length && lines[i].trim() && !lines[i].includes('-->')) {
-        if (text) text += ' ';
-        text += lines[i].trim();
-        i++;
-      }
-      i--; // Возвращаемся назад
-      
-      // Делаем текст ОЧЕНЬ заметным
-      if (text) {
-        const visibleText = `>>> ${text.toUpperCase()} <<<`;
-        result.push(visibleText);
-      }
-      
-      result.push(''); // Пустая строка
-      subtitleNum++;
-    }
+    // Форматируем время в SRT формат
+    const startSRT = formatTimeToSRT(startTime);
+    const endSRT = formatTimeToSRT(endTime);
+    
+    // Выбираем текст циклично
+    const text = testTexts[(subtitleIndex - 1) % testTexts.length];
+    
+    srtContent += `${subtitleIndex}\n`;
+    srtContent += `${startSRT} --> ${endSRT}\n`;
+    srtContent += `${text}\n\n`;
+    
+    subtitleIndex++;
   }
   
-  const visibleSRT = result.join('\n');
-  console.log(`[${taskId}] Visible SRT created, length: ${visibleSRT.length}`);
-  console.log(`[${taskId}] Visible SRT preview:`, visibleSRT.substring(0, 300));
+  console.log(`[${taskId}] Created ${subtitleIndex - 1} test subtitles`);
+  console.log(`[${taskId}] Test SRT preview:`, srtContent.substring(0, 300));
   
-  return visibleSRT;
+  return srtContent;
+}
+
+// Форматирование времени в SRT формат
+function formatTimeToSRT(seconds) {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  const ms = Math.floor((seconds % 1) * 1000);
+  
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`;
 }
 
 app.post('/process-video-with-subtitles', upload.single('video'), async (req, res) => {
   const taskId = req.body.task_id || uuidv4();
   const startTime = Date.now();
   
-  console.log(`\n=== [${taskId}] DEBUG VIDEO PROCESSING REQUEST ===`);
+  console.log(`\n=== [${taskId}] TEST VIDEO PROCESSING WITH FULL-LENGTH SUBTITLES ===`);
 
   try {
-    if (!req.file || !req.body.srt_content) {
+    if (!req.file) {
       return res.status(400).json({
         success: false,
-        error: 'Video file and SRT content are required',
+        error: 'Video file is required',
         task_id: taskId
       });
     }
 
     const videoBuffer = req.file.buffer;
-    const rawSrtContent = req.body.srt_content;
-    
     console.log(`[${taskId}] Video size: ${videoBuffer.length} bytes`);
-    console.log(`[${taskId}] Raw SRT length: ${rawSrtContent.length} chars`);
 
     // Создаем временные файлы
     const tempDir = '/tmp/processing';
@@ -128,42 +141,48 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
     }
 
     const inputVideoPath = path.join(tempDir, `input_${taskId}.mp4`);
-    const srtPath = path.join(tempDir, `subtitles_${taskId}.srt`);
+    const srtPath = path.join(tempDir, `test_subtitles_${taskId}.srt`);
     const outputVideoPath = path.join(tempDir, `output_${taskId}.mp4`);
 
     // Сохраняем видео
     fs.writeFileSync(inputVideoPath, videoBuffer);
+    console.log(`[${taskId}] Video saved to: ${inputVideoPath}`);
 
-    // Создаем ОЧЕНЬ заметный SRT
-    const visibleSRT = createVisibleSRT(rawSrtContent, taskId);
-    fs.writeFileSync(srtPath, visibleSRT, 'utf8');
+    // Получаем длительность видео
+    const videoDuration = getVideoDuration(inputVideoPath, taskId);
 
-    console.log(`[${taskId}] Files created successfully`);
+    // Создаем тестовые субтитры на всю длину видео
+    const testSRT = createFullLengthTestSRT(videoDuration, taskId);
+    fs.writeFileSync(srtPath, testSRT, 'utf8');
+    
+    console.log(`[${taskId}] Test SRT saved to: ${srtPath}`);
+    console.log(`[${taskId}] SRT file size: ${fs.statSync(srtPath).size} bytes`);
 
-    // Пробуем разные FFmpeg команды с максимально заметными субтитрами
+    // Множественные варианты FFmpeg команд для максимальной видимости
     const commands = [
-      // Команда 1: Большие желтые субтитры с черной обводкой
-      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='Fontsize=36,PrimaryColour=&H00ffff,OutlineColour=&H000000,Outline=3,Shadow=2,Bold=1'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
+      // Команда 1: Большие красные субтитры по центру
+      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='Fontsize=40,PrimaryColour=&H0000ff,OutlineColour=&Hffffff,Outline=3,Shadow=2,Bold=1,Alignment=2'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
       
-      // Команда 2: Простой drawtext для первого субтитра (для теста)
-      `ffmpeg -i "${inputVideoPath}" -vf "drawtext=text='ТЕСТ СУБТИТРОВ - ВИДНО ЛИ МЕНЯ?':fontsize=32:fontcolor=yellow:x=(w-text_w)/2:y=h-80:box=1:boxcolor=black:boxborderw=5" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
+      // Команда 2: Желтые субтитры с черным фоном
+      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='Fontsize=36,PrimaryColour=&H00ffff,BackColour=&H80000000,Outline=2,Bold=1'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
       
-      // Команда 3: subtitles фильтр без force_style
-      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
+      // Команда 3: Простой drawtext с фиксированным текстом (гарантированно видимый)
+      `ffmpeg -i "${inputVideoPath}" -vf "drawtext=text='🎯 CAPTIONS AI ТЕСТ - СУБТИТРЫ РАБОТАЮТ! 🎯':fontsize=36:fontcolor=red:x=(w-text_w)/2:y=h-100:box=1:boxcolor=white:boxborderw=10" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
       
-      // Команда 4: Принудительный белый текст на черном фоне
-      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='Fontsize=28,PrimaryColour=&Hffffff,BackColour=&H80000000,Outline=2,Shadow=1'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`
+      // Команда 4: Белые субтитры с толстой черной обводкой
+      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='Fontsize=32,PrimaryColour=&Hffffff,OutlineColour=&H000000,Outline=4,Shadow=3'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`
     ];
 
     let success = false;
     let usedCommand = 0;
+    let lastError = null;
     
     for (let i = 0; i < commands.length && !success; i++) {
       try {
-        console.log(`[${taskId}] === TRYING COMMAND ${i + 1} ===`);
+        console.log(`[${taskId}] 🎬 TRYING COMMAND ${i + 1} 🎬`);
         console.log(`[${taskId}] Command: ${commands[i]}`);
         
-        // Удаляем предыдущий выходной файл если есть
+        // Удаляем предыдущий файл
         if (fs.existsSync(outputVideoPath)) {
           fs.unlinkSync(outputVideoPath);
         }
@@ -181,14 +200,16 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
         if (fs.existsSync(outputVideoPath)) {
           const outputSize = fs.statSync(outputVideoPath).size;
           if (outputSize > 0) {
-            console.log(`[${taskId}] ✅ Command ${i + 1} succeeded! Output: ${outputSize} bytes`);
+            console.log(`[${taskId}] ✅ SUCCESS! Command ${i + 1} worked! Output: ${outputSize} bytes`);
             success = true;
             usedCommand = i + 1;
             
-            // Для команды 2 (drawtext) - это точно должно быть видно
-            if (i === 1) {
-              console.log(`[${taskId}] 🎯 USED DRAWTEXT - SUBTITLES SHOULD BE DEFINITELY VISIBLE!`);
+            // Особо отмечаем команду 3 (drawtext)
+            if (i === 2) {
+              console.log(`[${taskId}] 🔥 USED DRAWTEXT COMMAND - SUBTITLES ARE DEFINITELY VISIBLE! 🔥`);
             }
+            
+            break;
           } else {
             console.log(`[${taskId}] ❌ Command ${i + 1} created empty file`);
           }
@@ -198,20 +219,24 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
         
       } catch (error) {
         console.log(`[${taskId}] ❌ Command ${i + 1} failed:`, error.message);
+        lastError = error;
       }
     }
 
     if (!success) {
-      throw new Error('All FFmpeg commands failed');
+      throw new Error(`All commands failed. Last error: ${lastError?.message || 'Unknown'}`);
     }
 
     // Читаем результат
     const processedVideoBuffer = fs.readFileSync(outputVideoPath);
     const processingTime = Date.now() - startTime;
 
-    console.log(`[${taskId}] ✅ SUCCESS! Video processed with command ${usedCommand}`);
+    console.log(`[${taskId}] 🎉 FINAL SUCCESS! 🎉`);
+    console.log(`[${taskId}] Used command: ${usedCommand}`);
     console.log(`[${taskId}] Processing time: ${processingTime}ms`);
-    console.log(`[${taskId}] Final size: ${processedVideoBuffer.length} bytes`);
+    console.log(`[${taskId}] Input size: ${videoBuffer.length} bytes`);
+    console.log(`[${taskId}] Output size: ${processedVideoBuffer.length} bytes`);
+    console.log(`[${taskId}] Video duration: ${videoDuration} seconds`);
 
     // Очистка
     [inputVideoPath, srtPath, outputVideoPath].forEach(filePath => {
@@ -230,24 +255,27 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
         input_size_bytes: videoBuffer.length,
         output_size_bytes: processedVideoBuffer.length,
         compression_ratio: (processedVideoBuffer.length / videoBuffer.length).toFixed(2),
+        video_duration_seconds: videoDuration,
         ffmpeg_command_used: usedCommand,
-        subtitle_method: usedCommand === 2 ? 'drawtext_test' : 'subtitles_filter'
+        subtitle_method: usedCommand === 3 ? 'DRAWTEXT_GUARANTEED_VISIBLE' : 'SUBTITLES_FILTER'
       },
       video_data: processedVideoBuffer.toString('base64'),
       content_type: 'video/mp4',
-      debug_info: {
-        command_used: usedCommand,
-        subtitle_visibility: usedCommand === 2 ? 'GUARANTEED_VISIBLE' : 'FILTER_BASED'
+      test_info: {
+        full_length_subtitles: true,
+        subtitle_intervals: '5 seconds',
+        guaranteed_visible: usedCommand === 3,
+        test_message: usedCommand === 3 ? 'RED TEXT WITH WHITE BACKGROUND' : 'STYLED SUBTITLES'
       }
     });
 
   } catch (error) {
-    console.error(`[${taskId}] ❌ FATAL ERROR:`, error.message);
+    console.error(`[${taskId}] 💥 FATAL ERROR:`, error.message);
 
     // Очистка при ошибке
     const tempFiles = [
       `/tmp/processing/input_${taskId}.mp4`,
-      `/tmp/processing/subtitles_${taskId}.srt`,
+      `/tmp/processing/test_subtitles_${taskId}.srt`,
       `/tmp/processing/output_${taskId}.mp4`
     ];
     
@@ -269,6 +297,7 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
 });
 
 app.listen(PORT, () => {
-  console.log(`Debug Video Processing Service running on port ${PORT}`);
+  console.log(`Test Video Processing Service running on port ${PORT}`);
   console.log(`FFmpeg available: ${checkFFmpeg()}`);
+  console.log(`Ready to add FULL-LENGTH test subtitles!`);
 });
