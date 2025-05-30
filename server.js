@@ -173,11 +173,11 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
       // Команда 2: drawtext с Liberation шрифтом
       `ffmpeg -i "${inputVideoPath}" -vf "drawtext=fontfile=/usr/share/fonts/liberation/LiberationSans-Regular.ttf:text='✅ LIBERATION FONT TEST ✅':fontsize=28:fontcolor=lime:x=(w-text_w)/2:y=50:box=1:boxcolor=black:boxborderw=3" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
       
-      // Команда 3: subtitles фильтр с принудительным шрифтом
-      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='Fontname=DejaVu Sans,Fontsize=28,PrimaryColour=&Hffffff,OutlineColour=&H000000,Outline=2,Bold=1'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
+      // Команда 3: drawtext с Noto шрифтом
+      `ffmpeg -i "${inputVideoPath}" -vf "drawtext=fontfile=/usr/share/fonts/noto/NotoSans-Regular.ttf:text='📱 NOTO FONT РАБОТАЕТ 📱':fontsize=30:fontcolor=blue:x=(w-text_w)/2:y=(h-text_h)/2:box=1:boxcolor=yellow:boxborderw=4" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
       
-      // Команда 4: Базовый drawtext без указания шрифта (fallback)
-      `ffmpeg -i "${inputVideoPath}" -vf "drawtext=text='БАЗОВЫЙ ТЕКСТ':fontsize=24:fontcolor=yellow:x=50:y=50" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
+      // Команда 4: subtitles фильтр с принудительным шрифтом
+      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='Fontname=DejaVu Sans,Fontsize=28,PrimaryColour=&Hffffff,OutlineColour=&H000000,Outline=2,Bold=1'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
       
       // Команда 5: subtitles без force_style (простейший)
       `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`
