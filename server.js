@@ -304,9 +304,10 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
 });
 
 app.listen(PORT, () => {
-  console.log(`Fixed Fonts Video Processing Service running on port ${PORT}`);
+  console.log(`🎨 FONTS FIXED! Video Processing Service running on port ${PORT}`);
   const systemInfo = getSystemInfo();
   console.log(`FFmpeg available: ${systemInfo.ffmpeg_available}`);
   console.log(`DrawText support: ${systemInfo.drawtext_support}`);
   console.log(`Available fonts: ${systemInfo.fonts_available.length}`);
+  console.log(`First 3 fonts:`, systemInfo.fonts_available.slice(0, 3));
 });
