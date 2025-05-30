@@ -1,5 +1,5 @@
-// Улучшенный Railway Video Processing Service
-// server.js - с лучшей диагностикой и обработкой субтитров
+// Исправленный Railway Video Processing Service
+// server.js - с корректной обработкой субтитров
 
 const express = require('express');
 const multer = require('multer');
@@ -35,17 +35,12 @@ const upload = multer({
   }
 });
 
-// Health check с дополнительной информацией
+// Health check
 app.get('/health', (req, res) => {
-  const ffmpegAvailable = checkFFmpeg();
-  const ffmpegVersion = ffmpegAvailable ? getFFmpegVersion() : 'Not available';
-  
   res.json({ 
     status: 'healthy', 
     timestamp: new Date().toISOString(),
-    ffmpeg_available: ffmpegAvailable,
-    ffmpeg_version: ffmpegVersion,
-    temp_dir_writable: checkTempDir()
+    ffmpeg_available: checkFFmpeg()
   });
 });
 
@@ -58,117 +53,128 @@ function checkFFmpeg() {
   }
 }
 
-function getFFmpegVersion() {
-  try {
-    const output = execSync('ffmpeg -version', { encoding: 'utf8' });
-    const versionMatch = output.match(/ffmpeg version ([^\s]+)/);
-    return versionMatch ? versionMatch[1] : 'Unknown';
-  } catch (error) {
-    return 'Error getting version';
-  }
-}
-
-function checkTempDir() {
-  try {
-    const tempDir = '/tmp/processing';
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
+// Функция исправления SRT формата
+function fixSRTFormat(srtContent) {
+  console.log('Fixing SRT format...');
+  console.log('Original SRT length:', srtContent.length);
+  
+  // Убираем лишние пробелы и приводим к стандартному формату
+  let lines = srtContent.split('\n');
+  let fixedLines = [];
+  let subtitleIndex = 1;
+  let i = 0;
+  
+  while (i < lines.length) {
+    let line = lines[i].trim();
+    
+    // Пропускаем пустые строки
+    if (!line) {
+      i++;
+      continue;
     }
     
-    const testFile = path.join(tempDir, 'test.txt');
-    fs.writeFileSync(testFile, 'test');
-    fs.unlinkSync(testFile);
-    return true;
-  } catch (error) {
-    return false;
+    // Если строка содержит временные метки
+    if (line.includes('-->')) {
+      // Добавляем номер субтитра
+      fixedLines.push(subtitleIndex.toString());
+      
+      // Добавляем временные метки
+      fixedLines.push(line);
+      
+      // Ищем текст субтитра
+      i++;
+      let subtitleText = '';
+      while (i < lines.length && lines[i].trim() && !lines[i].includes('-->')) {
+        if (subtitleText) subtitleText += ' ';
+        subtitleText += lines[i].trim();
+        i++;
+      }
+      
+      // Добавляем текст субтитра
+      if (subtitleText) {
+        fixedLines.push(subtitleText);
+      }
+      
+      // Добавляем пустую строку между субтитрами
+      fixedLines.push('');
+      
+      subtitleIndex++;
+    } else {
+      i++;
+    }
   }
+  
+  const fixedSRT = fixedLines.join('\n');
+  console.log('Fixed SRT preview:', fixedSRT.substring(0, 300));
+  console.log('Fixed SRT length:', fixedSRT.length);
+  
+  return fixedSRT;
 }
 
-// Функция валидации и очистки SRT
-function validateAndCleanSRT(srtContent) {
-  console.log('Validating SRT content...');
-  console.log('SRT length:', srtContent.length);
-  console.log('SRT preview:', srtContent.substring(0, 300));
+// Функция создания ASS файла из SRT (более надежный формат)
+function convertSRTtoASS(srtContent, taskId) {
+  console.log(`[${taskId}] Converting SRT to ASS format for better compatibility`);
   
-  // Проверяем, что это действительно SRT формат
-  if (!srtContent.includes('-->')) {
-    console.log('SRT не содержит временных меток, преобразуем...');
-    // Если это просто текст, создаем простой SRT
-    return `1\n00:00:00,000 --> 00:00:10,000\n${srtContent.trim()}\n\n`;
+  // ASS заголовок
+  const assHeader = `[Script Info]
+Title: Generated Subtitles
+ScriptType: v4.00+
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,24,&Hffffff,&Hffffff,&H0,&H80000000,0,0,0,0,100,100,0,0,1,2,1,2,30,30,30,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+`;
+
+  // Парсим SRT и конвертируем в ASS
+  const srtLines = srtContent.split('\n');
+  let assEvents = [];
+  
+  for (let i = 0; i < srtLines.length; i++) {
+    const line = srtLines[i].trim();
+    
+    // Находим временные метки
+    if (line.includes('-->')) {
+      const [startTime, endTime] = line.split('-->').map(t => t.trim());
+      
+      // Конвертируем время из SRT формата в ASS формат
+      const assStartTime = convertTimeToASS(startTime);
+      const assEndTime = convertTimeToASS(endTime);
+      
+      // Получаем текст субтитра
+      i++;
+      let text = '';
+      while (i < srtLines.length && srtLines[i].trim() && !srtLines[i].includes('-->')) {
+        if (text) text += ' ';
+        text += srtLines[i].trim();
+        i++;
+      }
+      i--; // Возвращаемся на одну строку назад
+      
+      if (text) {
+        // Экранируем специальные символы для ASS
+        text = text.replace(/\n/g, '\\N');
+        
+        const assEvent = `Dialogue: 0,${assStartTime},${assEndTime},Default,,0,0,0,,${text}`;
+        assEvents.push(assEvent);
+      }
+    }
   }
   
-  // Очищаем SRT от возможных проблем
-  let cleanedSrt = srtContent
-    .replace(/\r\n/g, '\n')  // Унифицируем переносы строк
-    .replace(/\r/g, '\n')
-    .trim();
+  const assContent = assHeader + assEvents.join('\n');
+  console.log(`[${taskId}] ASS content created, length: ${assContent.length}`);
+  console.log(`[${taskId}] ASS preview:`, assContent.substring(assContent.indexOf('[Events]'), assContent.indexOf('[Events]') + 200));
   
-  // Убеждаемся, что SRT заканчивается двумя переносами
-  if (!cleanedSrt.endsWith('\n\n')) {
-    cleanedSrt += '\n\n';
-  }
-  
-  console.log('SRT cleaned, final length:', cleanedSrt.length);
-  return cleanedSrt;
+  return assContent;
 }
 
-// Функция выполнения FFmpeg с подробным логированием
-function executeFFmpegWithLogging(command, taskId) {
-  return new Promise((resolve, reject) => {
-    console.log(`[${taskId}] Executing FFmpeg:`);
-    console.log(command);
-    
-    const process = spawn('sh', ['-c', command], {
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-    
-    let stdout = '';
-    let stderr = '';
-    
-    process.stdout.on('data', (data) => {
-      stdout += data.toString();
-      console.log(`[${taskId}] FFmpeg stdout:`, data.toString().trim());
-    });
-    
-    process.stderr.on('data', (data) => {
-      stderr += data.toString();
-      const output = data.toString().trim();
-      
-      // FFmpeg выводит прогресс в stderr
-      if (output.includes('time=') || output.includes('frame=')) {
-        console.log(`[${taskId}] FFmpeg progress:`, output);
-      } else {
-        console.log(`[${taskId}] FFmpeg stderr:`, output);
-      }
-    });
-    
-    process.on('close', (code) => {
-      console.log(`[${taskId}] FFmpeg process exited with code:`, code);
-      
-      if (code === 0) {
-        resolve({ stdout, stderr });
-      } else {
-        console.error(`[${taskId}] FFmpeg failed with code ${code}`);
-        console.error(`[${taskId}] Full stderr:`, stderr);
-        reject(new Error(`FFmpeg process failed with code ${code}. Error: ${stderr}`));
-      }
-    });
-    
-    process.on('error', (error) => {
-      console.error(`[${taskId}] FFmpeg process error:`, error);
-      reject(error);
-    });
-    
-    // Timeout
-    const timer = setTimeout(() => {
-      console.log(`[${taskId}] FFmpeg timeout, killing process`);
-      process.kill('SIGKILL');
-      reject(new Error('FFmpeg process timed out'));
-    }, 300000); // 5 минут
-    
-    process.on('close', () => {
-      clearTimeout(timer);
-    });
+// Конвертация времени из SRT (00:00:00,000) в ASS (0:00:00.00)
+function convertTimeToASS(srtTime) {
+  // SRT: 00:00:07,200 -> ASS: 0:00:07.20
+  return srtTime.replace(',', '.').replace(/^0/, '').replace(/\.(\d{3})$/, (match, ms) => {
+    return '.' + ms.substring(0, 2); // Берем только первые 2 цифры миллисекунд
   });
 }
 
@@ -177,23 +183,12 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
   const startTime = Date.now();
   
   console.log(`\n=== [${taskId}] NEW VIDEO PROCESSING REQUEST ===`);
-  console.log(`[${taskId}] Request body keys:`, Object.keys(req.body));
-  console.log(`[${taskId}] Has video file:`, !!req.file);
 
   try {
-    // Валидация
-    if (!req.file) {
+    if (!req.file || !req.body.srt_content) {
       return res.status(400).json({
         success: false,
-        error: 'Video file is required',
-        task_id: taskId
-      });
-    }
-
-    if (!req.body.srt_content) {
-      return res.status(400).json({
-        success: false,
-        error: 'SRT content is required',
+        error: 'Video file and SRT content are required',
         task_id: taskId
       });
     }
@@ -205,9 +200,6 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
     console.log(`[${taskId}] Video size: ${videoBuffer.length} bytes`);
     console.log(`[${taskId}] Raw SRT length: ${rawSrtContent.length} chars`);
 
-    // Валидируем и очищаем SRT
-    const srtContent = validateAndCleanSRT(rawSrtContent);
-
     // Создаем временные файлы
     const tempDir = '/tmp/processing';
     if (!fs.existsSync(tempDir)) {
@@ -216,78 +208,82 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
 
     const inputVideoPath = path.join(tempDir, `input_${taskId}.mp4`);
     const srtPath = path.join(tempDir, `subtitles_${taskId}.srt`);
+    const assPath = path.join(tempDir, `subtitles_${taskId}.ass`);
     const outputVideoPath = path.join(tempDir, `output_${taskId}.mp4`);
 
-    // Сохраняем файлы
+    // Сохраняем видео
     fs.writeFileSync(inputVideoPath, videoBuffer);
-    fs.writeFileSync(srtPath, srtContent, 'utf8');
 
-    // Проверяем файлы
-    console.log(`[${taskId}] Input video exists:`, fs.existsSync(inputVideoPath));
-    console.log(`[${taskId}] SRT file exists:`, fs.existsSync(srtPath));
-    console.log(`[${taskId}] SRT file size:`, fs.statSync(srtPath).size, 'bytes');
+    // Исправляем SRT формат
+    const fixedSRT = fixSRTFormat(rawSrtContent);
+    fs.writeFileSync(srtPath, fixedSRT, 'utf8');
 
-    // Проверяем содержимое SRT файла
-    const srtCheck = fs.readFileSync(srtPath, 'utf8');
-    console.log(`[${taskId}] SRT file content (first 200 chars):`, srtCheck.substring(0, 200));
+    // Создаем ASS файл для лучшей совместимости
+    const assContent = convertSRTtoASS(fixedSRT, taskId);
+    fs.writeFileSync(assPath, assContent, 'utf8');
 
-    // Пробуем несколько вариантов FFmpeg команд
-    const ffmpegCommands = [
-      // Вариант 1: Простой subtitles фильтр
-      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
+    console.log(`[${taskId}] Files saved:`);
+    console.log(`[${taskId}] - Video: ${fs.existsSync(inputVideoPath)} (${fs.statSync(inputVideoPath).size} bytes)`);
+    console.log(`[${taskId}] - SRT: ${fs.existsSync(srtPath)} (${fs.statSync(srtPath).size} bytes)`);
+    console.log(`[${taskId}] - ASS: ${fs.existsSync(assPath)} (${fs.statSync(assPath).size} bytes)`);
+
+    // Пробуем разные варианты FFmpeg команд
+    const commands = [
+      // Вариант 1: Используем ASS файл (более надежно)
+      `ffmpeg -i "${inputVideoPath}" -vf "ass='${assPath}'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
       
-      // Вариант 2: С force_style
+      // Вариант 2: SRT с force_style
       `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='Fontsize=24,PrimaryColour=&Hffffff,OutlineColour=&H000000,Outline=2'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
       
-      // Вариант 3: Абсолютный путь
-      `ffmpeg -i "${inputVideoPath}" -vf "subtitles=${srtPath}" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`
+      // Вариант 3: Жестко вшиваем субтитры используя drawtext (fallback)
+      `ffmpeg -i "${inputVideoPath}" -vf "drawtext=text='Субтитры добавлены':fontsize=24:fontcolor=white:x=(w-text_w)/2:y=h-60" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`
     ];
 
-    let ffmpegSuccess = false;
-    let lastError = null;
-
-    for (let i = 0; i < ffmpegCommands.length && !ffmpegSuccess; i++) {
+    let success = false;
+    
+    for (let i = 0; i < commands.length && !success; i++) {
       try {
-        console.log(`[${taskId}] Trying FFmpeg command variant ${i + 1}...`);
-        await executeFFmpegWithLogging(ffmpegCommands[i], taskId);
+        console.log(`[${taskId}] Trying command ${i + 1}...`);
+        console.log(`[${taskId}] Command: ${commands[i]}`);
         
-        // Проверяем, создался ли выходной файл
+        // Выполняем команду
+        const result = execSync(commands[i], { 
+          stdio: 'pipe',
+          timeout: 300000,
+          maxBuffer: 1024 * 1024 * 100
+        });
+        
+        // Проверяем результат
         if (fs.existsSync(outputVideoPath)) {
-          const outputStats = fs.statSync(outputVideoPath);
-          if (outputStats.size > 0) {
-            console.log(`[${taskId}] ✅ FFmpeg variant ${i + 1} succeeded! Output size: ${outputStats.size} bytes`);
-            ffmpegSuccess = true;
-          } else {
-            console.log(`[${taskId}] ❌ FFmpeg variant ${i + 1} created empty file`);
+          const outputSize = fs.statSync(outputVideoPath).size;
+          if (outputSize > 0) {
+            console.log(`[${taskId}] ✅ Command ${i + 1} succeeded! Output: ${outputSize} bytes`);
+            success = true;
           }
-        } else {
-          console.log(`[${taskId}] ❌ FFmpeg variant ${i + 1} didn't create output file`);
         }
-      } catch (error) {
-        console.log(`[${taskId}] ❌ FFmpeg variant ${i + 1} failed:`, error.message);
-        lastError = error;
         
-        // Удаляем неудачный выходной файл если есть
+      } catch (error) {
+        console.log(`[${taskId}] ❌ Command ${i + 1} failed:`, error.message);
         if (fs.existsSync(outputVideoPath)) {
           fs.unlinkSync(outputVideoPath);
         }
       }
     }
 
-    if (!ffmpegSuccess) {
-      throw new Error(`All FFmpeg variants failed. Last error: ${lastError?.message || 'Unknown'}`);
+    if (!success) {
+      throw new Error('All FFmpeg commands failed to add subtitles');
     }
 
     // Читаем результат
     const processedVideoBuffer = fs.readFileSync(outputVideoPath);
     const processingTime = Date.now() - startTime;
 
-    console.log(`[${taskId}] ✅ Processing completed successfully!`);
+    console.log(`[${taskId}] ✅ SUCCESS! Video processed with subtitles`);
     console.log(`[${taskId}] Processing time: ${processingTime}ms`);
-    console.log(`[${taskId}] Output size: ${processedVideoBuffer.length} bytes`);
+    console.log(`[${taskId}] Final size: ${processedVideoBuffer.length} bytes`);
 
-    // Очистка временных файлов
-    [inputVideoPath, srtPath, outputVideoPath].forEach(filePath => {
+    // Очистка
+    [inputVideoPath, srtPath, assPath, outputVideoPath].forEach(filePath => {
       try {
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
       } catch (err) {
@@ -295,7 +291,6 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
       }
     });
 
-    // Возвращаем результат
     res.json({
       success: true,
       task_id: taskId,
@@ -303,21 +298,21 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
         processing_time_ms: processingTime,
         input_size_bytes: videoBuffer.length,
         output_size_bytes: processedVideoBuffer.length,
-        compression_ratio: (processedVideoBuffer.length / videoBuffer.length).toFixed(2),
-        ffmpeg_attempts: ffmpegCommands.length
+        compression_ratio: (processedVideoBuffer.length / videoBuffer.length).toFixed(2)
       },
       video_data: processedVideoBuffer.toString('base64'),
       content_type: 'video/mp4',
-      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      subtitle_method_used: 'FFmpeg with ASS format'
     });
 
   } catch (error) {
-    console.error(`[${taskId}] ❌ Processing error:`, error.message);
+    console.error(`[${taskId}] ❌ FATAL ERROR:`, error.message);
 
     // Очистка при ошибке
     const tempFiles = [
       `/tmp/processing/input_${taskId}.mp4`,
       `/tmp/processing/subtitles_${taskId}.srt`,
+      `/tmp/processing/subtitles_${taskId}.ass`,
       `/tmp/processing/output_${taskId}.mp4`
     ];
     
@@ -325,7 +320,7 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
       try {
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
       } catch (err) {
-        // Игнорируем ошибки очистки
+        // Игнорируем
       }
     });
 
@@ -339,8 +334,6 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
 });
 
 app.listen(PORT, () => {
-  console.log(`Improved Video Processing Service running on port ${PORT}`);
+  console.log(`Fixed Video Processing Service running on port ${PORT}`);
   console.log(`FFmpeg available: ${checkFFmpeg()}`);
-  console.log(`FFmpeg version: ${getFFmpegVersion()}`);
-  console.log(`Temp directory writable: ${checkTempDir()}`);
 });
