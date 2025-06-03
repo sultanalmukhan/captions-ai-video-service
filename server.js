@@ -211,29 +211,29 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
 
     console.log(`[${taskId}] ✅ Files prepared with beautiful formatting`);
 
-    // Улучшенные настройки стиля субтитров
+    // Улучшенные настройки стиля субтитров с уменьшенными размерами
     const subtitleStyles = {
       default: {
-        fontsize: 28,
+        fontsize: 22,
         fontcolor: 'white',
         outline: 3,
         shadow: 2,
         alignment: 2, // По центру
         marginv: 40,  // Отступ снизу
-        description: 'Красивый базовый стиль'
+        description: 'Читаемый базовый стиль'
       },
       pro: {
-        fontsize: 32,
+        fontsize: 26,
         fontcolor: 'white',
         outline: 4,
         shadow: 3,
         bold: 1,
         alignment: 2,
         marginv: 50,
-        description: 'Pro стиль с крупным шрифтом и тенью'
+        description: 'Pro стиль с умеренным шрифтом'
       },
       premium: {
-        fontsize: 36,
+        fontsize: 30,
         fontcolor: 'yellow',
         outline: 4,
         shadow: 3,
@@ -241,7 +241,7 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
         alignment: 2,
         marginv: 60,
         backcolour: '&H80000000', // Полупрозрачный черный фон
-        description: 'Premium стиль с желтым цветом и фоном'
+        description: 'Premium стиль с крупным шрифтом'
       }
     };
 
@@ -397,8 +397,8 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
 
 app.listen(PORT, () => {
   console.log(`✨ BEAUTIFUL Subtitle Service running on port ${PORT} ✨`);
-  console.log(`🎨 Enhanced visual formatting enabled!`);
+  console.log(`🎨 Enhanced visual formatting with optimized font sizes!`);
+  console.log(`📏 Font sizes: Default=22px, Pro=26px, Premium=30px`);
   const systemInfo = getSystemInfo();
   console.log(`FFmpeg: ${systemInfo.ffmpeg_available}`);
-  console.log(`Beautiful styles: Default, Pro, Premium`);
 });
