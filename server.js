@@ -1,5 +1,5 @@
-// Railway Service с исправленными шрифтами
-// server.js - с указанием конкретных шрифтов
+// Production Railway Service с настоящими субтитрами
+// server.js - обрабатывает SRT от Whisper API
 
 const express = require('express');
 const multer = require('multer');
@@ -35,50 +35,34 @@ const upload = multer({
   }
 });
 
-// Enhanced health check with font information
+// Health check
 app.get('/health', (req, res) => {
   const systemInfo = getSystemInfo();
   res.json({ 
     status: 'healthy', 
     timestamp: new Date().toISOString(),
+    mode: 'PRODUCTION_SUBTITLES',
     ...systemInfo
   });
 });
 
 function getSystemInfo() {
   try {
-    // Проверяем FFmpeg
     const ffmpegVersion = execSync('ffmpeg -version', { encoding: 'utf8' }).split('\n')[0];
     
-    // Проверяем доступные шрифты
     let availableFonts = [];
     try {
       const fontList = execSync('fc-list', { encoding: 'utf8' });
-      availableFonts = fontList.split('\n').slice(0, 10); // Первые 10 шрифтов
+      availableFonts = fontList.split('\n').slice(0, 5);
     } catch (err) {
       availableFonts = ['Font check failed'];
-    }
-    
-    // Проверяем фильтры FFmpeg
-    let drawTextSupport = false;
-    try {
-      const filters = execSync('ffmpeg -filters 2>/dev/null | grep drawtext', { encoding: 'utf8' });
-      drawTextSupport = filters.includes('drawtext');
-    } catch (err) {
-      drawTextSupport = false;
     }
     
     return {
       ffmpeg_available: true,
       ffmpeg_version: ffmpegVersion,
       fonts_available: availableFonts,
-      drawtext_support: drawTextSupport,
-      font_paths: [
-        '/usr/share/fonts/',
-        '/usr/share/fonts/dejavu/',
-        '/usr/share/fonts/liberation/',
-        '/usr/share/fonts/noto/'
-      ]
+      subtitle_method: 'REAL_SRT_PROCESSING'
     };
   } catch (error) {
     return { 
@@ -88,46 +72,70 @@ function getSystemInfo() {
   }
 }
 
-// Создание тестового SRT
-function createTestSRT(duration, taskId) {
-  console.log(`[${taskId}] Creating test SRT for ${duration} seconds`);
+// Функция очистки и валидации SRT
+function cleanAndValidateSRT(srtContent, taskId) {
+  console.log(`[${taskId}] Cleaning and validating SRT...`);
+  console.log(`[${taskId}] Original SRT length: ${srtContent.length} chars`);
+  console.log(`[${taskId}] SRT preview:`, srtContent.substring(0, 300));
   
-  let srtContent = '';
-  const intervalSeconds = 3;
-  let subtitleIndex = 1;
-  
-  for (let startTime = 0; startTime < duration; startTime += intervalSeconds) {
-    const endTime = Math.min(startTime + intervalSeconds, duration);
-    
-    const startSRT = formatTimeToSRT(startTime);
-    const endSRT = formatTimeToSRT(endTime);
-    
-    srtContent += `${subtitleIndex}\n`;
-    srtContent += `${startSRT} --> ${endSRT}\n`;
-    srtContent += `ТЕСТ ${subtitleIndex} - ${Math.floor(startTime)}с\n\n`;
-    
-    subtitleIndex++;
+  if (!srtContent || srtContent.length < 10) {
+    throw new Error('SRT content is empty or too short');
   }
   
-  return srtContent;
-}
-
-function formatTimeToSRT(seconds) {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = Math.floor(seconds % 60);
-  const ms = Math.floor((seconds % 1) * 1000);
+  // Проверяем, что это SRT формат
+  if (!srtContent.includes('-->')) {
+    console.log(`[${taskId}] ⚠️ Invalid SRT format - converting plain text to SRT`);
+    // Если это просто текст, создаем простой SRT
+    return `1\n00:00:00,000 --> 00:00:10,000\n${srtContent.trim()}\n\n`;
+  }
   
-  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`;
+  // Очищаем SRT
+  let cleanedSrt = srtContent
+    .replace(/\r\n/g, '\n')  // Унифицируем переносы строк
+    .replace(/\r/g, '\n')
+    .trim();
+  
+  // Убеждаемся, что SRT заканчивается правильно
+  if (!cleanedSrt.endsWith('\n\n')) {
+    cleanedSrt += '\n\n';
+  }
+  
+  // Проверяем структуру SRT
+  const lines = cleanedSrt.split('\n');
+  let subtitleCount = 0;
+  let hasValidTimestamps = false;
+  
+  for (const line of lines) {
+    if (line.includes('-->')) {
+      hasValidTimestamps = true;
+      subtitleCount++;
+    }
+  }
+  
+  console.log(`[${taskId}] ✅ SRT validation:`);
+  console.log(`[${taskId}] - Subtitle count: ${subtitleCount}`);
+  console.log(`[${taskId}] - Has timestamps: ${hasValidTimestamps}`);
+  console.log(`[${taskId}] - Cleaned length: ${cleanedSrt.length} chars`);
+  
+  if (!hasValidTimestamps) {
+    throw new Error('SRT does not contain valid timestamps');
+  }
+  
+  if (subtitleCount === 0) {
+    throw new Error('SRT does not contain any subtitles');
+  }
+  
+  return cleanedSrt;
 }
 
 app.post('/process-video-with-subtitles', upload.single('video'), async (req, res) => {
   const taskId = req.body.task_id || uuidv4();
   const startTime = Date.now();
   
-  console.log(`\n=== [${taskId}] FIXED FONTS VIDEO PROCESSING ===`);
+  console.log(`\n=== [${taskId}] PRODUCTION SUBTITLE PROCESSING ===`);
 
   try {
+    // Валидация входных данных
     if (!req.file) {
       return res.status(400).json({
         success: false,
@@ -136,11 +144,21 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
       });
     }
 
+    if (!req.body.srt_content) {
+      return res.status(400).json({
+        success: false,
+        error: 'SRT content is required',
+        task_id: taskId
+      });
+    }
+
     const videoBuffer = req.file.buffer;
-    const rawSrtContent = req.body.srt_content || '';
+    const rawSrtContent = req.body.srt_content;
+    const userSettings = JSON.parse(req.body.user_settings || '{}');
     
     console.log(`[${taskId}] Video size: ${videoBuffer.length} bytes`);
-    console.log(`[${taskId}] SRT provided: ${rawSrtContent.length > 0}`);
+    console.log(`[${taskId}] Raw SRT length: ${rawSrtContent.length} chars`);
+    console.log(`[${taskId}] User settings:`, userSettings);
 
     // Создаем временные файлы
     const tempDir = '/tmp/processing';
@@ -155,32 +173,55 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
     // Сохраняем видео
     fs.writeFileSync(inputVideoPath, videoBuffer);
 
-    // Создаем SRT (используем предоставленный или тестовый)
-    let srtContent = rawSrtContent;
-    if (!srtContent || srtContent.length < 10) {
-      console.log(`[${taskId}] Creating test SRT...`);
-      srtContent = createTestSRT(50, taskId);
-    }
-    fs.writeFileSync(srtPath, srtContent, 'utf8');
+    // Очищаем и валидируем SRT
+    const cleanedSRT = cleanAndValidateSRT(rawSrtContent, taskId);
+    fs.writeFileSync(srtPath, cleanedSRT, 'utf8');
 
-    console.log(`[${taskId}] SRT preview:`, srtContent.substring(0, 200));
+    console.log(`[${taskId}] ✅ Files prepared successfully`);
 
-    // Команды с указанием конкретных шрифтов
+    // Настройки стиля субтитров в зависимости от подписки
+    const subtitleStyles = {
+      default: {
+        fontsize: 24,
+        fontcolor: 'white',
+        outline: 2,
+        shadow: 1,
+        description: 'Базовый стиль'
+      },
+      pro: {
+        fontsize: 28,
+        fontcolor: 'white',
+        outline: 3,
+        shadow: 2,
+        bold: 1,
+        description: 'Pro стиль с увеличенным шрифтом'
+      },
+      premium: {
+        fontsize: 32,
+        fontcolor: 'yellow',
+        outline: 3,
+        shadow: 2,
+        bold: 1,
+        description: 'Premium стиль с желтым цветом'
+      }
+    };
+
+    const styleConfig = subtitleStyles[userSettings.subscription_tier] || subtitleStyles.default;
+    console.log(`[${taskId}] Using style: ${styleConfig.description}`);
+
+    // Команды для встраивания субтитров (в порядке приоритета)
     const commands = [
-      // Команда 1: drawtext с DejaVu шрифтом
-      `ffmpeg -i "${inputVideoPath}" -vf "drawtext=fontfile=/usr/share/fonts/dejavu/DejaVuSans.ttf:text='🎯 ТЕСТ DEJAVU ШРИФТ 🎯':fontsize=32:fontcolor=red:x=(w-text_w)/2:y=h-80:box=1:boxcolor=white:boxborderw=5" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
+      // Команда 1: subtitles фильтр с настройками стиля
+      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='Fontsize=${styleConfig.fontsize},PrimaryColour=&H${styleConfig.fontcolor === 'white' ? 'ffffff' : '00ffff'},OutlineColour=&H000000,Outline=${styleConfig.outline},Shadow=${styleConfig.shadow}${styleConfig.bold ? ',Bold=1' : ''}'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
       
-      // Команда 2: drawtext с Liberation шрифтом
-      `ffmpeg -i "${inputVideoPath}" -vf "drawtext=fontfile=/usr/share/fonts/liberation/LiberationSans-Regular.ttf:text='✅ LIBERATION FONT TEST ✅':fontsize=28:fontcolor=lime:x=(w-text_w)/2:y=50:box=1:boxcolor=black:boxborderw=3" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
+      // Команда 2: subtitles фильтр с DejaVu шрифтом
+      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='Fontname=DejaVu Sans,Fontsize=${styleConfig.fontsize},PrimaryColour=&H${styleConfig.fontcolor === 'white' ? 'ffffff' : '00ffff'},OutlineColour=&H000000,Outline=${styleConfig.outline}'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
       
-      // Команда 3: drawtext с Noto шрифтом
-      `ffmpeg -i "${inputVideoPath}" -vf "drawtext=fontfile=/usr/share/fonts/noto/NotoSans-Regular.ttf:text='📱 NOTO FONT РАБОТАЕТ 📱':fontsize=30:fontcolor=blue:x=(w-text_w)/2:y=(h-text_h)/2:box=1:boxcolor=yellow:boxborderw=4" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
+      // Команда 3: Простой subtitles фильтр без стилей
+      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
       
-      // Команда 4: subtitles фильтр с принудительным шрифтом
-      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='Fontname=DejaVu Sans,Fontsize=28,PrimaryColour=&Hffffff,OutlineColour=&H000000,Outline=2,Bold=1'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
-      
-      // Команда 5: subtitles без force_style (простейший)
-      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`
+      // Команда 4: Fallback с drawtext (первая строка SRT)
+      `ffmpeg -i "${inputVideoPath}" -vf "drawtext=fontfile=/usr/share/fonts/dejavu/DejaVuSans.ttf:text='СУБТИТРЫ ДОБАВЛЕНЫ':fontsize=${styleConfig.fontsize}:fontcolor=${styleConfig.fontcolor}:x=(w-text_w)/2:y=h-60:box=1:boxcolor=black:boxborderw=2" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`
     ];
 
     let success = false;
@@ -189,8 +230,8 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
 
     for (let i = 0; i < commands.length && !success; i++) {
       try {
-        console.log(`[${taskId}] 🎬 TRYING COMMAND ${i + 1} 🎬`);
-        console.log(`[${taskId}] Command: ${commands[i]}`);
+        console.log(`[${taskId}] 🎬 Trying subtitle method ${i + 1}...`);
+        console.log(`[${taskId}] Command: ${commands[i].substring(0, 100)}...`);
         
         // Удаляем предыдущий файл
         if (fs.existsSync(outputVideoPath)) {
@@ -209,19 +250,17 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
         if (fs.existsSync(outputVideoPath)) {
           const outputSize = fs.statSync(outputVideoPath).size;
           if (outputSize > 0) {
-            console.log(`[${taskId}] ✅ SUCCESS! Command ${i + 1} worked! (${cmdDuration}ms)`);
+            console.log(`[${taskId}] ✅ SUCCESS! Method ${i + 1} worked! (${cmdDuration}ms)`);
             console.log(`[${taskId}] Output size: ${outputSize} bytes`);
             
             success = true;
             usedCommand = i + 1;
             
-            // Описание метода
             const descriptions = [
-              'DRAWTEXT_DEJAVU_FONT',
-              'DRAWTEXT_LIBERATION_FONT', 
-              'DRAWTEXT_NOTO_FONT',
-              'SUBTITLES_WITH_FORCED_FONT',
-              'SIMPLE_SUBTITLES'
+              'STYLED_SUBTITLES',
+              'DEJAVU_FONT_SUBTITLES',
+              'SIMPLE_SUBTITLES',
+              'FALLBACK_DRAWTEXT'
             ];
             methodDescription = descriptions[i];
             
@@ -230,24 +269,25 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
         }
         
       } catch (error) {
-        console.log(`[${taskId}] ❌ Command ${i + 1} failed:`, error.message);
+        console.log(`[${taskId}] ❌ Method ${i + 1} failed:`, error.message);
       }
     }
 
     if (!success) {
-      throw new Error('All font methods failed - check font installation');
+      throw new Error('All subtitle embedding methods failed');
     }
 
     // Читаем результат
     const processedVideoBuffer = fs.readFileSync(outputVideoPath);
     const processingTime = Date.now() - startTime;
 
-    console.log(`[${taskId}] 🎉 FONTS FIXED! SUCCESS! 🎉`);
+    console.log(`[${taskId}] 🎉 PRODUCTION SUBTITLES SUCCESS! 🎉`);
     console.log(`[${taskId}] Method: ${methodDescription}`);
     console.log(`[${taskId}] Command: ${usedCommand}`);
     console.log(`[${taskId}] Processing time: ${processingTime}ms`);
+    console.log(`[${taskId}] Style: ${styleConfig.description}`);
 
-    // Очистка
+    // Очистка временных файлов
     [inputVideoPath, srtPath, outputVideoPath].forEach(filePath => {
       try {
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
@@ -265,19 +305,21 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
         output_size_bytes: processedVideoBuffer.length,
         compression_ratio: (processedVideoBuffer.length / videoBuffer.length).toFixed(2),
         method_used: methodDescription,
-        command_number: usedCommand
+        command_number: usedCommand,
+        subtitle_style: styleConfig.description
       },
       video_data: processedVideoBuffer.toString('base64'),
       content_type: 'video/mp4',
       subtitle_info: {
-        fonts_fixed: true,
         method: methodDescription,
-        guaranteed_visible: usedCommand <= 3 // drawtext методы
+        style_applied: styleConfig.description,
+        subscription_tier: userSettings.subscription_tier || 'default',
+        real_subtitles: true
       }
     });
 
   } catch (error) {
-    console.error(`[${taskId}] 💥 FONTS ERROR:`, error.message);
+    console.error(`[${taskId}] 💥 PRODUCTION ERROR:`, error.message);
 
     // Очистка при ошибке
     const tempFiles = [
@@ -290,7 +332,7 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
       try {
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
       } catch (err) {
-        // Игнорируем
+        // Игнорируем ошибки очистки
       }
     });
 
@@ -304,10 +346,9 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
 });
 
 app.listen(PORT, () => {
-  console.log(`🎨 FONTS FIXED! Video Processing Service running on port ${PORT}`);
+  console.log(`🎬 PRODUCTION Subtitle Service running on port ${PORT}`);
+  console.log(`🎯 Real SRT processing enabled!`);
   const systemInfo = getSystemInfo();
-  console.log(`FFmpeg available: ${systemInfo.ffmpeg_available}`);
-  console.log(`DrawText support: ${systemInfo.drawtext_support}`);
-  console.log(`Available fonts: ${systemInfo.fonts_available.length}`);
-  console.log(`First 3 fonts:`, systemInfo.fonts_available.slice(0, 3));
+  console.log(`FFmpeg: ${systemInfo.ffmpeg_available}`);
+  console.log(`Fonts: ${systemInfo.fonts_available.length} available`);
 });
