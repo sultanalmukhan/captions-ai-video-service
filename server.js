@@ -35,27 +35,29 @@ const upload = multer({
   }
 });
 
-// 🎨 ГОТОВЫЕ СТИЛИ ДЛЯ СОЦИАЛЬНЫХ СЕТЕЙ (МОБИЛЬНЫЕ РАЗМЕРЫ + СОВРЕМЕННЫЕ ШРИФТЫ)
+// 🎨 ГОТОВЫЕ СТИЛИ ДЛЯ СОЦИАЛЬНЫХ СЕТЕЙ (МОБИЛЬНЫЕ РАЗМЕРЫ + УМНЫЕ FALLBACK ШРИФТЫ)
 const SUBTITLE_STYLES = {
   // TikTok стили
   tiktok_classic: {
     fontsize: 16,
     fontcolor: 'white',
-    fontname: 'DejaVu Sans',
+    fontname: 'DejaVu Sans', // Надежный fallback
+    fontnames: ['Ubuntu', 'Liberation Sans', 'DejaVu Sans'], // Приоритет шрифтов
     outline: 3,
     shadow: 2,
     bold: 1,
     alignment: 2,
     marginv: 30,
-    backcolour: '&H80000000', // Полупрозрачный черный фон
+    backcolour: '&H80000000',
     name: 'TikTok Classic',
     description: 'Классический TikTok - белый жирный текст с черным фоном'
   },
   
   tiktok_neon: {
     fontsize: 18,
-    fontcolor: '00ffff', // Яркий голубой
+    fontcolor: '00ffff',
     fontname: 'Liberation Sans',
+    fontnames: ['Roboto', 'Liberation Sans', 'Noto Sans'],
     outline: 3,
     shadow: 2,
     bold: 1,
@@ -67,8 +69,9 @@ const SUBTITLE_STYLES = {
   
   tiktok_yellow: {
     fontsize: 17,
-    fontcolor: 'ffff00', // Ярко-желтый
+    fontcolor: 'ffff00',
     fontname: 'Ubuntu',
+    fontnames: ['Ubuntu', 'Open Sans', 'DejaVu Sans'],
     outline: 3,
     shadow: 2,
     bold: 1,
@@ -83,11 +86,12 @@ const SUBTITLE_STYLES = {
     fontsize: 15,
     fontcolor: 'ffffff',
     fontname: 'Noto Sans',
+    fontnames: ['Noto Sans', 'Open Sans', 'Liberation Sans'],
     outline: 2,
     shadow: 1,
     alignment: 2,
     marginv: 35,
-    backcolour: '&H40000000', // Легкий черный фон
+    backcolour: '&H40000000',
     name: 'Instagram Clean',
     description: 'Чистый Instagram стиль - элегантный белый текст'
   },
@@ -96,6 +100,7 @@ const SUBTITLE_STYLES = {
     fontsize: 14,
     fontcolor: 'ffffff',
     fontname: 'Roboto',
+    fontnames: ['Roboto', 'Noto Sans', 'DejaVu Sans'],
     outline: 2,
     shadow: 1,
     alignment: 2,
@@ -108,6 +113,7 @@ const SUBTITLE_STYLES = {
     fontsize: 16,
     fontcolor: 'ffffff',
     fontname: 'Open Sans',
+    fontnames: ['Open Sans', 'Liberation Sans', 'DejaVu Sans'],
     outline: 3,
     shadow: 2,
     bold: 1,
@@ -122,7 +128,8 @@ const SUBTITLE_STYLES = {
   youtube_classic: {
     fontsize: 14,
     fontcolor: 'ffffff',
-    fontname: 'Lato',
+    fontname: 'Liberation Sans',
+    fontnames: ['Source Sans Pro', 'Liberation Sans', 'Noto Sans'],
     outline: 2,
     shadow: 1,
     alignment: 2,
@@ -133,8 +140,9 @@ const SUBTITLE_STYLES = {
   
   youtube_gaming: {
     fontsize: 15,
-    fontcolor: '00ff00', // Зеленый
-    fontname: 'Source Sans Pro',
+    fontcolor: '00ff00',
+    fontname: 'DejaVu Sans',
+    fontnames: ['Ubuntu', 'DejaVu Sans', 'Liberation Sans'],
     outline: 2,
     shadow: 1,
     bold: 1,
@@ -147,8 +155,9 @@ const SUBTITLE_STYLES = {
   // Современные трендовые стили
   modern_gradient: {
     fontsize: 17,
-    fontcolor: 'ff69b4', // Розовый
-    fontname: 'Montserrat',
+    fontcolor: 'ff69b4',
+    fontname: 'Open Sans',
+    fontnames: ['Montserrat', 'Open Sans', 'Liberation Sans'],
     outline: 3,
     shadow: 2,
     bold: 1,
@@ -160,8 +169,9 @@ const SUBTITLE_STYLES = {
   
   retro_vhs: {
     fontsize: 16,
-    fontcolor: 'ff00ff', // Магента
-    fontname: 'Droid Sans',
+    fontcolor: 'ff00ff',
+    fontname: 'DejaVu Sans',
+    fontnames: ['Ubuntu', 'DejaVu Sans', 'Liberation Sans'],
     outline: 2,
     shadow: 2,
     bold: 1,
@@ -173,13 +183,14 @@ const SUBTITLE_STYLES = {
   
   minimal_black: {
     fontsize: 13,
-    fontcolor: '000000', // Черный текст
-    fontname: 'PT Sans',
+    fontcolor: '000000',
+    fontname: 'Noto Sans',
+    fontnames: ['Roboto', 'Noto Sans', 'Liberation Sans'],
     outline: 0,
     shadow: 0,
     alignment: 2,
     marginv: 20,
-    backcolour: '&H80ffffff', // Белый полупрозрачный фон
+    backcolour: '&H80ffffff',
     name: 'Minimal Black',
     description: 'Минималистичный - черный текст на белом фоне'
   },
@@ -187,8 +198,9 @@ const SUBTITLE_STYLES = {
   // Премиум стили
   luxury_gold: {
     fontsize: 18,
-    fontcolor: 'ffd700', // Золотой
-    fontname: 'Oswald',
+    fontcolor: 'ffd700',
+    fontname: 'DejaVu Sans',
+    fontnames: ['Ubuntu', 'DejaVu Sans', 'Liberation Sans'],
     outline: 3,
     shadow: 2,
     bold: 1,
@@ -201,8 +213,9 @@ const SUBTITLE_STYLES = {
   
   neon_purple: {
     fontsize: 17,
-    fontcolor: '9400d3', // Фиолетовый
-    fontname: 'Raleway',
+    fontcolor: '9400d3',
+    fontname: 'Liberation Sans',
+    fontnames: ['Open Sans', 'Liberation Sans', 'Noto Sans'],
     outline: 3,
     shadow: 2,
     bold: 1,
