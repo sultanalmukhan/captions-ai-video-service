@@ -35,78 +35,78 @@ const upload = multer({
   }
 });
 
-// 🎨 ГОТОВЫЕ СТИЛИ ДЛЯ СОЦИАЛЬНЫХ СЕТЕЙ
+// 🎨 ГОТОВЫЕ СТИЛИ ДЛЯ СОЦИАЛЬНЫХ СЕТЕЙ (МОБИЛЬНЫЕ РАЗМЕРЫ)
 const SUBTITLE_STYLES = {
   // TikTok стили
   tiktok_classic: {
-    fontsize: 28,
+    fontsize: 16,
     fontcolor: 'white',
-    outline: 4,
-    shadow: 3,
+    outline: 3,
+    shadow: 2,
     bold: 1,
     alignment: 2,
-    marginv: 50,
+    marginv: 30,
     backcolour: '&H80000000', // Полупрозрачный черный фон
     name: 'TikTok Classic',
     description: 'Классический TikTok - белый жирный текст с черным фоном'
   },
   
   tiktok_neon: {
-    fontsize: 32,
+    fontsize: 18,
     fontcolor: '00ffff', // Яркий голубой
-    outline: 5,
-    shadow: 4,
+    outline: 3,
+    shadow: 2,
     bold: 1,
     alignment: 2,
-    marginv: 45,
+    marginv: 25,
     name: 'TikTok Neon',
     description: 'Неоновый TikTok стиль - яркий голубой с сильной обводкой'
   },
   
   tiktok_yellow: {
-    fontsize: 30,
+    fontsize: 17,
     fontcolor: 'ffff00', // Ярко-желтый
-    outline: 4,
-    shadow: 3,
+    outline: 3,
+    shadow: 2,
     bold: 1,
     alignment: 2,
-    marginv: 50,
+    marginv: 30,
     name: 'TikTok Yellow',
     description: 'Желтый TikTok стиль - как у популярных блогеров'
   },
   
   // Instagram стили
   instagram_clean: {
-    fontsize: 26,
+    fontsize: 15,
     fontcolor: 'ffffff',
-    outline: 3,
-    shadow: 2,
+    outline: 2,
+    shadow: 1,
     alignment: 2,
-    marginv: 60,
+    marginv: 35,
     backcolour: '&H40000000', // Легкий черный фон
     name: 'Instagram Clean',
     description: 'Чистый Instagram стиль - элегантный белый текст'
   },
   
   instagram_story: {
-    fontsize: 24,
+    fontsize: 14,
     fontcolor: 'ffffff',
     outline: 2,
     shadow: 1,
     alignment: 2,
-    marginv: 80,
+    marginv: 40,
     name: 'Instagram Story',
     description: 'Стиль Instagram Stories - тонкий и изящный'
   },
   
   instagram_reel: {
-    fontsize: 28,
+    fontsize: 16,
     fontcolor: 'ffffff',
-    outline: 4,
-    shadow: 3,
+    outline: 3,
+    shadow: 2,
     bold: 1,
     alignment: 2,
-    marginv: 55,
+    marginv: 30,
     backcolour: '&H60000000',
     name: 'Instagram Reel',
     description: 'Стиль Instagram Reels - жирный и контрастный'
@@ -114,60 +114,60 @@ const SUBTITLE_STYLES = {
   
   // YouTube стили
   youtube_classic: {
-    fontsize: 24,
+    fontsize: 14,
     fontcolor: 'ffffff',
     outline: 2,
     shadow: 1,
     alignment: 2,
-    marginv: 40,
+    marginv: 25,
     name: 'YouTube Classic',
     description: 'Классический YouTube - стандартные субтитры'
   },
   
   youtube_gaming: {
-    fontsize: 26,
+    fontsize: 15,
     fontcolor: '00ff00', // Зеленый
-    outline: 3,
-    shadow: 2,
+    outline: 2,
+    shadow: 1,
     bold: 1,
     alignment: 2,
-    marginv: 45,
+    marginv: 28,
     name: 'YouTube Gaming',
     description: 'Игровой стиль YouTube - зеленый геймерский'
   },
   
   // Современные трендовые стили
   modern_gradient: {
-    fontsize: 30,
+    fontsize: 17,
     fontcolor: 'ff69b4', // Розовый
-    outline: 4,
-    shadow: 3,
+    outline: 3,
+    shadow: 2,
     bold: 1,
     alignment: 2,
-    marginv: 50,
+    marginv: 30,
     name: 'Modern Pink',
     description: 'Модерн розовый - трендовый цвет 2024'
   },
   
   retro_vhs: {
-    fontsize: 28,
+    fontsize: 16,
     fontcolor: 'ff00ff', // Магента
-    outline: 3,
-    shadow: 4,
+    outline: 2,
+    shadow: 2,
     bold: 1,
     alignment: 2,
-    marginv: 45,
+    marginv: 28,
     name: 'Retro VHS',
     description: 'Ретро VHS стиль - фиолетовый винтаж'
   },
   
   minimal_black: {
-    fontsize: 22,
+    fontsize: 13,
     fontcolor: '000000', // Черный текст
     outline: 0,
     shadow: 0,
     alignment: 2,
-    marginv: 35,
+    marginv: 20,
     backcolour: '&H80ffffff', // Белый полупрозрачный фон
     name: 'Minimal Black',
     description: 'Минималистичный - черный текст на белом фоне'
@@ -175,26 +175,26 @@ const SUBTITLE_STYLES = {
   
   // Премиум стили
   luxury_gold: {
-    fontsize: 32,
+    fontsize: 18,
     fontcolor: 'ffd700', // Золотой
-    outline: 4,
-    shadow: 3,
+    outline: 3,
+    shadow: 2,
     bold: 1,
     alignment: 2,
-    marginv: 55,
+    marginv: 32,
     backcolour: '&H80000000',
     name: 'Luxury Gold',
     description: 'Премиум золотой - роскошный стиль'
   },
   
   neon_purple: {
-    fontsize: 30,
+    fontsize: 17,
     fontcolor: '9400d3', // Фиолетовый
-    outline: 5,
-    shadow: 4,
+    outline: 3,
+    shadow: 2,
     bold: 1,
     alignment: 2,
-    marginv: 50,
+    marginv: 30,
     name: 'Neon Purple',
     description: 'Неоновый фиолетовый - киберпанк стиль'
   }
