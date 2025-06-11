@@ -1,5 +1,5 @@
-// Beautiful Railway Service с красивыми субтитрами
-// server.js - улучшенное визуальное оформление без изменения времени
+// Beautiful Railway Service с готовыми стилями для соц.сетей
+// server.js - готовые шаблоны стилей TikTok/Instagram
 
 const express = require('express');
 const multer = require('multer');
@@ -35,14 +35,221 @@ const upload = multer({
   }
 });
 
-// Health check
+// 🎨 ГОТОВЫЕ СТИЛИ ДЛЯ СОЦИАЛЬНЫХ СЕТЕЙ
+const SUBTITLE_STYLES = {
+  // TikTok стили
+  tiktok_classic: {
+    fontsize: 28,
+    fontcolor: 'white',
+    outline: 4,
+    shadow: 3,
+    bold: 1,
+    alignment: 2,
+    marginv: 50,
+    backcolour: '&H80000000', // Полупрозрачный черный фон
+    name: 'TikTok Classic',
+    description: 'Классический TikTok - белый жирный текст с черным фоном'
+  },
+  
+  tiktok_neon: {
+    fontsize: 32,
+    fontcolor: '00ffff', // Яркий голубой
+    outline: 5,
+    shadow: 4,
+    bold: 1,
+    alignment: 2,
+    marginv: 45,
+    name: 'TikTok Neon',
+    description: 'Неоновый TikTok стиль - яркий голубой с сильной обводкой'
+  },
+  
+  tiktok_yellow: {
+    fontsize: 30,
+    fontcolor: 'ffff00', // Ярко-желтый
+    outline: 4,
+    shadow: 3,
+    bold: 1,
+    alignment: 2,
+    marginv: 50,
+    name: 'TikTok Yellow',
+    description: 'Желтый TikTok стиль - как у популярных блогеров'
+  },
+  
+  // Instagram стили
+  instagram_clean: {
+    fontsize: 26,
+    fontcolor: 'ffffff',
+    outline: 3,
+    shadow: 2,
+    alignment: 2,
+    marginv: 60,
+    backcolour: '&H40000000', // Легкий черный фон
+    name: 'Instagram Clean',
+    description: 'Чистый Instagram стиль - элегантный белый текст'
+  },
+  
+  instagram_story: {
+    fontsize: 24,
+    fontcolor: 'ffffff',
+    outline: 2,
+    shadow: 1,
+    alignment: 2,
+    marginv: 80,
+    name: 'Instagram Story',
+    description: 'Стиль Instagram Stories - тонкий и изящный'
+  },
+  
+  instagram_reel: {
+    fontsize: 28,
+    fontcolor: 'ffffff',
+    outline: 4,
+    shadow: 3,
+    bold: 1,
+    alignment: 2,
+    marginv: 55,
+    backcolour: '&H60000000',
+    name: 'Instagram Reel',
+    description: 'Стиль Instagram Reels - жирный и контрастный'
+  },
+  
+  // YouTube стили
+  youtube_classic: {
+    fontsize: 24,
+    fontcolor: 'ffffff',
+    outline: 2,
+    shadow: 1,
+    alignment: 2,
+    marginv: 40,
+    name: 'YouTube Classic',
+    description: 'Классический YouTube - стандартные субтитры'
+  },
+  
+  youtube_gaming: {
+    fontsize: 26,
+    fontcolor: '00ff00', // Зеленый
+    outline: 3,
+    shadow: 2,
+    bold: 1,
+    alignment: 2,
+    marginv: 45,
+    name: 'YouTube Gaming',
+    description: 'Игровой стиль YouTube - зеленый геймерский'
+  },
+  
+  // Современные трендовые стили
+  modern_gradient: {
+    fontsize: 30,
+    fontcolor: 'ff69b4', // Розовый
+    outline: 4,
+    shadow: 3,
+    bold: 1,
+    alignment: 2,
+    marginv: 50,
+    name: 'Modern Pink',
+    description: 'Модерн розовый - трендовый цвет 2024'
+  },
+  
+  retro_vhs: {
+    fontsize: 28,
+    fontcolor: 'ff00ff', // Магента
+    outline: 3,
+    shadow: 4,
+    bold: 1,
+    alignment: 2,
+    marginv: 45,
+    name: 'Retro VHS',
+    description: 'Ретро VHS стиль - фиолетовый винтаж'
+  },
+  
+  minimal_black: {
+    fontsize: 22,
+    fontcolor: '000000', // Черный текст
+    outline: 0,
+    shadow: 0,
+    alignment: 2,
+    marginv: 35,
+    backcolour: '&H80ffffff', // Белый полупрозрачный фон
+    name: 'Minimal Black',
+    description: 'Минималистичный - черный текст на белом фоне'
+  },
+  
+  // Премиум стили
+  luxury_gold: {
+    fontsize: 32,
+    fontcolor: 'ffd700', // Золотой
+    outline: 4,
+    shadow: 3,
+    bold: 1,
+    alignment: 2,
+    marginv: 55,
+    backcolour: '&H80000000',
+    name: 'Luxury Gold',
+    description: 'Премиум золотой - роскошный стиль'
+  },
+  
+  neon_purple: {
+    fontsize: 30,
+    fontcolor: '9400d3', // Фиолетовый
+    outline: 5,
+    shadow: 4,
+    bold: 1,
+    alignment: 2,
+    marginv: 50,
+    name: 'Neon Purple',
+    description: 'Неоновый фиолетовый - киберпанк стиль'
+  }
+};
+
+// Health check с информацией о доступных стилях
 app.get('/health', (req, res) => {
   const systemInfo = getSystemInfo();
+  const availableStyles = Object.keys(SUBTITLE_STYLES).map(key => ({
+    id: key,
+    name: SUBTITLE_STYLES[key].name,
+    description: SUBTITLE_STYLES[key].description
+  }));
+  
   res.json({ 
     status: 'healthy', 
     timestamp: new Date().toISOString(),
-    mode: 'BEAUTIFUL_SUBTITLES',
+    mode: 'SOCIAL_MEDIA_STYLES',
+    available_styles: availableStyles,
+    total_styles: availableStyles.length,
     ...systemInfo
+  });
+});
+
+// Новый endpoint для получения всех стилей
+app.get('/styles', (req, res) => {
+  const stylesWithPreview = Object.keys(SUBTITLE_STYLES).map(key => {
+    const style = SUBTITLE_STYLES[key];
+    return {
+      id: key,
+      name: style.name,
+      description: style.description,
+      preview: {
+        fontsize: style.fontsize,
+        fontcolor: style.fontcolor,
+        has_background: !!style.backcolour,
+        has_bold: !!style.bold,
+        category: key.split('_')[0] // tiktok, instagram, youtube, etc.
+      }
+    };
+  });
+  
+  // Группируем по категориям
+  const groupedStyles = stylesWithPreview.reduce((acc, style) => {
+    const category = style.preview.category;
+    if (!acc[category]) acc[category] = [];
+    acc[category].push(style);
+    return acc;
+  }, {});
+  
+  res.json({
+    success: true,
+    styles: stylesWithPreview,
+    grouped_styles: groupedStyles,
+    total_count: stylesWithPreview.length
   });
 });
 
@@ -62,7 +269,7 @@ function getSystemInfo() {
       ffmpeg_available: true,
       ffmpeg_version: ffmpegVersion,
       fonts_available: availableFonts,
-      subtitle_method: 'BEAUTIFUL_SRT_PROCESSING'
+      subtitle_method: 'SOCIAL_MEDIA_STYLES'
     };
   } catch (error) {
     return { 
@@ -164,7 +371,7 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
   const taskId = req.body.task_id || uuidv4();
   const startTime = Date.now();
   
-  console.log(`\n=== [${taskId}] BEAUTIFUL SUBTITLE PROCESSING ===`);
+  console.log(`\n=== [${taskId}] SOCIAL MEDIA SUBTITLE PROCESSING ===`);
 
   try {
     // Валидация входных данных
@@ -186,11 +393,27 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
 
     const videoBuffer = req.file.buffer;
     const rawSrtContent = req.body.srt_content;
-    const userSettings = JSON.parse(req.body.user_settings || '{}');
+    
+    // 🎨 НОВАЯ ЛОГИКА: получаем style_id из запроса
+    const styleId = req.body.style_id || 'tiktok_classic'; // По умолчанию TikTok Classic
+    const customStyle = req.body.custom_style ? JSON.parse(req.body.custom_style) : null;
     
     console.log(`[${taskId}] Video size: ${videoBuffer.length} bytes`);
     console.log(`[${taskId}] Raw SRT length: ${rawSrtContent.length} chars`);
-    console.log(`[${taskId}] User settings:`, userSettings);
+    console.log(`[${taskId}] Requested style: ${styleId}`);
+    
+    // Выбираем стиль
+    let selectedStyle;
+    if (customStyle) {
+      selectedStyle = customStyle;
+      console.log(`[${taskId}] Using CUSTOM style:`, customStyle);
+    } else if (SUBTITLE_STYLES[styleId]) {
+      selectedStyle = SUBTITLE_STYLES[styleId];
+      console.log(`[${taskId}] Using predefined style: ${selectedStyle.name}`);
+    } else {
+      selectedStyle = SUBTITLE_STYLES.tiktok_classic;
+      console.log(`[${taskId}] Style not found, using default: ${selectedStyle.name}`);
+    }
 
     // Создаем временные файлы
     const tempDir = '/tmp/processing';
@@ -209,61 +432,70 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
     const beautifiedSRT = beautifySRT(rawSrtContent, taskId);
     fs.writeFileSync(srtPath, beautifiedSRT, 'utf8');
 
-    console.log(`[${taskId}] ✅ Files prepared with beautiful formatting`);
+    console.log(`[${taskId}] ✅ Files prepared with style: ${selectedStyle.name || 'Custom'}`);
 
-    // Улучшенные настройки стиля субтитров с уменьшенными размерами
-    const subtitleStyles = {
-      default: {
-        fontsize: 22,
-        fontcolor: 'white',
-        outline: 3,
-        shadow: 2,
-        alignment: 2, // По центру
-        marginv: 40,  // Отступ снизу
-        description: 'Читаемый базовый стиль'
-      },
-      pro: {
-        fontsize: 26,
-        fontcolor: 'white',
-        outline: 4,
-        shadow: 3,
-        bold: 1,
-        alignment: 2,
-        marginv: 50,
-        description: 'Pro стиль с умеренным шрифтом'
-      },
-      premium: {
-        fontsize: 30,
-        fontcolor: 'yellow',
-        outline: 4,
-        shadow: 3,
-        bold: 1,
-        alignment: 2,
-        marginv: 60,
-        backcolour: '&H80000000', // Полупрозрачный черный фон
-        description: 'Premium стиль с крупным шрифтом'
+    // Строим FFmpeg команды с выбранным стилем
+    const buildStyleString = (style) => {
+      let styleStr = `Fontsize=${style.fontsize}`;
+      
+      // Цвет текста
+      if (style.fontcolor) {
+        const color = style.fontcolor.startsWith('&H') ? style.fontcolor : `&H${style.fontcolor}`;
+        styleStr += `,PrimaryColour=${color}`;
       }
+      
+      // Обводка
+      if (style.outline) {
+        styleStr += `,OutlineColour=&H000000,Outline=${style.outline}`;
+      }
+      
+      // Тень
+      if (style.shadow) {
+        styleStr += `,Shadow=${style.shadow}`;
+      }
+      
+      // Жирность
+      if (style.bold) {
+        styleStr += `,Bold=${style.bold}`;
+      }
+      
+      // Выравнивание
+      if (style.alignment) {
+        styleStr += `,Alignment=${style.alignment}`;
+      }
+      
+      // Отступ
+      if (style.marginv) {
+        styleStr += `,MarginV=${style.marginv}`;
+      }
+      
+      // Фон
+      if (style.backcolour) {
+        styleStr += `,BackColour=${style.backcolour}`;
+      }
+      
+      return styleStr;
     };
 
-    const styleConfig = subtitleStyles[userSettings.subscription_tier] || subtitleStyles.default;
-    console.log(`[${taskId}] Using beautiful style: ${styleConfig.description}`);
+    const styleString = buildStyleString(selectedStyle);
+    console.log(`[${taskId}] Style string: ${styleString}`);
 
-    // Команды для встраивания красивых субтитров
+    // Команды для встраивания субтитров с выбранным стилем
     const commands = [
-      // Команда 1: Полный красивый стиль
-      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='Fontname=DejaVu Sans,Fontsize=${styleConfig.fontsize},PrimaryColour=&H${styleConfig.fontcolor === 'white' ? 'ffffff' : '00ffff'},OutlineColour=&H000000,Outline=${styleConfig.outline},Shadow=${styleConfig.shadow}${styleConfig.bold ? ',Bold=1' : ''},Alignment=${styleConfig.alignment},MarginV=${styleConfig.marginv}${styleConfig.backcolour ? ',BackColour=' + styleConfig.backcolour : ''}'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
+      // Команда 1: Полный стиль с DejaVu Sans
+      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='Fontname=DejaVu Sans,${styleString}'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
       
-      // Команда 2: Упрощенный красивый стиль
-      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='Fontsize=${styleConfig.fontsize},PrimaryColour=&H${styleConfig.fontcolor === 'white' ? 'ffffff' : '00ffff'},OutlineColour=&H000000,Outline=${styleConfig.outline},Shadow=${styleConfig.shadow},Alignment=2'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
+      // Команда 2: Без указания шрифта
+      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${styleString}'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
       
-      // Команда 3: Базовый стиль с DejaVu
-      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='Fontname=DejaVu Sans,Fontsize=${styleConfig.fontsize},PrimaryColour=&Hffffff,OutlineColour=&H000000,Outline=3'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
+      // Команда 3: Упрощенный стиль
+      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${selectedStyle.outline || 3}'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
       
-      // Команда 4: Простой метод
+      // Команда 4: Базовый метод
       `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
       
-      // Команда 5: Fallback с красивым drawtext
-      `ffmpeg -i "${inputVideoPath}" -vf "drawtext=fontfile=/usr/share/fonts/dejavu/DejaVuSans.ttf:text='✨ КРАСИВЫЕ СУБТИТРЫ ДОБАВЛЕНЫ ✨':fontsize=${styleConfig.fontsize}:fontcolor=${styleConfig.fontcolor}:x=(w-text_w)/2:y=h-80:box=1:boxcolor=black@0.7:boxborderw=5" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`
+      // Команда 5: Fallback
+      `ffmpeg -i "${inputVideoPath}" -vf "drawtext=fontfile=/usr/share/fonts/dejavu/DejaVuSans.ttf:text='✨ STYLED SUBTITLES ✨':fontsize=${selectedStyle.fontsize}:fontcolor=${selectedStyle.fontcolor || 'white'}:x=(w-text_w)/2:y=h-80:box=1:boxcolor=black@0.7:boxborderw=5" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`
     ];
 
     let success = false;
@@ -272,7 +504,7 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
 
     for (let i = 0; i < commands.length && !success; i++) {
       try {
-        console.log(`[${taskId}] ✨ Trying beautiful method ${i + 1}...`);
+        console.log(`[${taskId}] 🎨 Trying style method ${i + 1}...`);
         console.log(`[${taskId}] Command preview: ${commands[i].substring(0, 120)}...`);
         
         // Удаляем предыдущий файл
@@ -292,18 +524,18 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
         if (fs.existsSync(outputVideoPath)) {
           const outputSize = fs.statSync(outputVideoPath).size;
           if (outputSize > 0) {
-            console.log(`[${taskId}] ✅ SUCCESS! Beautiful method ${i + 1} worked! (${cmdDuration}ms)`);
+            console.log(`[${taskId}] ✅ SUCCESS! Style method ${i + 1} worked! (${cmdDuration}ms)`);
             console.log(`[${taskId}] Output size: ${outputSize} bytes`);
             
             success = true;
             usedCommand = i + 1;
             
             const descriptions = [
-              'FULL_BEAUTIFUL_STYLE',
-              'SIMPLIFIED_BEAUTIFUL_STYLE',
-              'DEJAVU_BEAUTIFUL_STYLE',
-              'SIMPLE_BEAUTIFUL_STYLE',
-              'FALLBACK_BEAUTIFUL_DRAWTEXT'
+              'FULL_STYLE_WITH_FONT',
+              'FULL_STYLE_NO_FONT',
+              'SIMPLIFIED_STYLE',
+              'BASIC_SUBTITLES',
+              'FALLBACK_DRAWTEXT'
             ];
             methodDescription = descriptions[i];
             
@@ -312,23 +544,23 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
         }
         
       } catch (error) {
-        console.log(`[${taskId}] ❌ Beautiful method ${i + 1} failed:`, error.message);
+        console.log(`[${taskId}] ❌ Style method ${i + 1} failed:`, error.message);
       }
     }
 
     if (!success) {
-      throw new Error('All beautiful subtitle methods failed');
+      throw new Error('All style methods failed');
     }
 
     // Читаем результат
     const processedVideoBuffer = fs.readFileSync(outputVideoPath);
     const processingTime = Date.now() - startTime;
 
-    console.log(`[${taskId}] 🎉 BEAUTIFUL SUBTITLES SUCCESS! ✨`);
+    console.log(`[${taskId}] 🎉 STYLED SUBTITLES SUCCESS! 🎨`);
+    console.log(`[${taskId}] Style: ${selectedStyle.name || 'Custom'}`);
     console.log(`[${taskId}] Method: ${methodDescription}`);
     console.log(`[${taskId}] Command: ${usedCommand}`);
     console.log(`[${taskId}] Processing time: ${processingTime}ms`);
-    console.log(`[${taskId}] Style: ${styleConfig.description}`);
 
     // Очистка временных файлов
     [inputVideoPath, srtPath, outputVideoPath].forEach(filePath => {
@@ -348,28 +580,20 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
         output_size_bytes: processedVideoBuffer.length,
         compression_ratio: (processedVideoBuffer.length / videoBuffer.length).toFixed(2),
         method_used: methodDescription,
-        command_number: usedCommand,
-        subtitle_style: styleConfig.description
+        command_number: usedCommand
       },
       video_data: processedVideoBuffer.toString('base64'),
       content_type: 'video/mp4',
-      subtitle_info: {
-        method: methodDescription,
-        style_applied: styleConfig.description,
-        subscription_tier: userSettings.subscription_tier || 'default',
-        beautiful_formatting: true,
-        features: [
-          'Improved text spacing',
-          'Better punctuation', 
-          'Smart line breaks',
-          'Enhanced visual style',
-          'Proper alignment'
-        ]
+      style_info: {
+        style_id: customStyle ? 'custom' : styleId,
+        style_name: selectedStyle.name || 'Custom Style',
+        style_description: selectedStyle.description || 'Custom user style',
+        applied_settings: selectedStyle
       }
     });
 
   } catch (error) {
-    console.error(`[${taskId}] 💥 BEAUTIFUL ERROR:`, error.message);
+    console.error(`[${taskId}] 💥 STYLE ERROR:`, error.message);
 
     // Очистка при ошибке
     const tempFiles = [
@@ -396,9 +620,9 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
 });
 
 app.listen(PORT, () => {
-  console.log(`✨ BEAUTIFUL Subtitle Service running on port ${PORT} ✨`);
-  console.log(`🎨 Enhanced visual formatting with optimized font sizes!`);
-  console.log(`📏 Font sizes: Default=22px, Pro=26px, Premium=30px`);
+  console.log(`🎨 SOCIAL MEDIA Subtitle Service running on port ${PORT} 🎨`);
+  console.log(`📱 Ready for TikTok, Instagram, YouTube styles!`);
+  console.log(`🎬 Total available styles: ${Object.keys(SUBTITLE_STYLES).length}`);
   const systemInfo = getSystemInfo();
   console.log(`FFmpeg: ${systemInfo.ffmpeg_available}`);
 });
