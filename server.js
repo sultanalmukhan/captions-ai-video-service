@@ -35,12 +35,13 @@ const upload = multer({
   }
 });
 
-// 🎨 ГОТОВЫЕ СТИЛИ ДЛЯ СОЦИАЛЬНЫХ СЕТЕЙ (МОБИЛЬНЫЕ РАЗМЕРЫ)
+// 🎨 ГОТОВЫЕ СТИЛИ ДЛЯ СОЦИАЛЬНЫХ СЕТЕЙ (МОБИЛЬНЫЕ РАЗМЕРЫ + СОВРЕМЕННЫЕ ШРИФТЫ)
 const SUBTITLE_STYLES = {
   // TikTok стили
   tiktok_classic: {
     fontsize: 16,
     fontcolor: 'white',
+    fontname: 'DejaVu Sans',
     outline: 3,
     shadow: 2,
     bold: 1,
@@ -54,6 +55,7 @@ const SUBTITLE_STYLES = {
   tiktok_neon: {
     fontsize: 18,
     fontcolor: '00ffff', // Яркий голубой
+    fontname: 'Liberation Sans',
     outline: 3,
     shadow: 2,
     bold: 1,
@@ -66,6 +68,7 @@ const SUBTITLE_STYLES = {
   tiktok_yellow: {
     fontsize: 17,
     fontcolor: 'ffff00', // Ярко-желтый
+    fontname: 'Ubuntu',
     outline: 3,
     shadow: 2,
     bold: 1,
@@ -79,6 +82,7 @@ const SUBTITLE_STYLES = {
   instagram_clean: {
     fontsize: 15,
     fontcolor: 'ffffff',
+    fontname: 'Noto Sans',
     outline: 2,
     shadow: 1,
     alignment: 2,
@@ -91,6 +95,7 @@ const SUBTITLE_STYLES = {
   instagram_story: {
     fontsize: 14,
     fontcolor: 'ffffff',
+    fontname: 'Roboto',
     outline: 2,
     shadow: 1,
     alignment: 2,
@@ -102,6 +107,7 @@ const SUBTITLE_STYLES = {
   instagram_reel: {
     fontsize: 16,
     fontcolor: 'ffffff',
+    fontname: 'Open Sans',
     outline: 3,
     shadow: 2,
     bold: 1,
@@ -116,6 +122,7 @@ const SUBTITLE_STYLES = {
   youtube_classic: {
     fontsize: 14,
     fontcolor: 'ffffff',
+    fontname: 'Lato',
     outline: 2,
     shadow: 1,
     alignment: 2,
@@ -127,6 +134,7 @@ const SUBTITLE_STYLES = {
   youtube_gaming: {
     fontsize: 15,
     fontcolor: '00ff00', // Зеленый
+    fontname: 'Source Sans Pro',
     outline: 2,
     shadow: 1,
     bold: 1,
@@ -140,6 +148,7 @@ const SUBTITLE_STYLES = {
   modern_gradient: {
     fontsize: 17,
     fontcolor: 'ff69b4', // Розовый
+    fontname: 'Montserrat',
     outline: 3,
     shadow: 2,
     bold: 1,
@@ -152,6 +161,7 @@ const SUBTITLE_STYLES = {
   retro_vhs: {
     fontsize: 16,
     fontcolor: 'ff00ff', // Магента
+    fontname: 'Droid Sans',
     outline: 2,
     shadow: 2,
     bold: 1,
@@ -164,6 +174,7 @@ const SUBTITLE_STYLES = {
   minimal_black: {
     fontsize: 13,
     fontcolor: '000000', // Черный текст
+    fontname: 'PT Sans',
     outline: 0,
     shadow: 0,
     alignment: 2,
@@ -177,6 +188,7 @@ const SUBTITLE_STYLES = {
   luxury_gold: {
     fontsize: 18,
     fontcolor: 'ffd700', // Золотой
+    fontname: 'Oswald',
     outline: 3,
     shadow: 2,
     bold: 1,
@@ -190,6 +202,7 @@ const SUBTITLE_STYLES = {
   neon_purple: {
     fontsize: 17,
     fontcolor: '9400d3', // Фиолетовый
+    fontname: 'Raleway',
     outline: 3,
     shadow: 2,
     bold: 1,
@@ -480,7 +493,7 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
     const styleString = buildStyleString(selectedStyle);
     console.log(`[${taskId}] Style string: ${styleString}`);
 
-    // Команды для встраивания субтитров с выбранным стилем
+ выбранным стилем
     const commands = [
       // Команда 1: Полный стиль с DejaVu Sans
       `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='Fontname=DejaVu Sans,${styleString}'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
