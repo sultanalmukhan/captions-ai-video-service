@@ -35,90 +35,90 @@ const upload = multer({
   }
 });
 
-// 🎨 ГОТОВЫЕ СТИЛИ ДЛЯ СОЦИАЛЬНЫХ СЕТЕЙ (МОБИЛЬНЫЕ РАЗМЕРЫ + УМНЫЕ FALLBACK ШРИФТЫ)
+// 🎨 ГОТОВЫЕ СТИЛИ ДЛЯ СОЦИАЛЬНЫХ СЕТЕЙ (КОМПАКТНЫЕ РАЗМЕРЫ + УМНЫЕ FALLBACK ШРИФТЫ)
 const SUBTITLE_STYLES = {
-  // TikTok стили
+  // TikTok стили  
   tiktok_classic: {
-    fontsize: 16,
+    fontsize: 8,  // 16/2 = 8
     fontcolor: 'white',
-    fontname: 'DejaVu Sans', // Надежный fallback
-    fontnames: ['Ubuntu', 'Liberation Sans', 'DejaVu Sans'], // Приоритет шрифтов
-    outline: 3,
-    shadow: 2,
+    fontname: 'DejaVu Sans',
+    fontnames: ['Ubuntu', 'Liberation Sans', 'DejaVu Sans'],
+    outline: 2,   // Уменьшили обводку
+    shadow: 1,    // Уменьшили тень
     bold: 1,
     alignment: 2,
-    marginv: 30,
+    marginv: 15,  // Уменьшили отступ
     backcolour: '&H80000000',
     name: 'TikTok Classic',
     description: 'Классический TikTok - белый жирный текст с черным фоном'
   },
   
   tiktok_neon: {
-    fontsize: 18,
+    fontsize: 9,  // 18/2 = 9
     fontcolor: '00ffff',
     fontname: 'Liberation Sans',
     fontnames: ['Roboto', 'Liberation Sans', 'Noto Sans'],
-    outline: 3,
-    shadow: 2,
+    outline: 2,
+    shadow: 1,
     bold: 1,
     alignment: 2,
-    marginv: 25,
+    marginv: 13,  // 25/2 ≈ 13
     name: 'TikTok Neon',
     description: 'Неоновый TikTok стиль - яркий голубой с сильной обводкой'
   },
   
   tiktok_yellow: {
-    fontsize: 17,
+    fontsize: 9,  // 17/2 ≈ 9
     fontcolor: 'ffff00',
     fontname: 'Ubuntu',
     fontnames: ['Ubuntu', 'Open Sans', 'DejaVu Sans'],
-    outline: 3,
-    shadow: 2,
+    outline: 2,
+    shadow: 1,
     bold: 1,
     alignment: 2,
-    marginv: 30,
+    marginv: 15,
     name: 'TikTok Yellow',
     description: 'Желтый TikTok стиль - как у популярных блогеров'
   },
   
   // Instagram стили
   instagram_clean: {
-    fontsize: 15,
+    fontsize: 8,  // 15/2 ≈ 8
     fontcolor: 'ffffff',
     fontname: 'Noto Sans',
     fontnames: ['Noto Sans', 'Open Sans', 'Liberation Sans'],
-    outline: 2,
+    outline: 1,
     shadow: 1,
     alignment: 2,
-    marginv: 35,
+    marginv: 18,  // 35/2 ≈ 18
     backcolour: '&H40000000',
     name: 'Instagram Clean',
     description: 'Чистый Instagram стиль - элегантный белый текст'
   },
   
   instagram_story: {
-    fontsize: 14,
+    fontsize: 7,  // 14/2 = 7
     fontcolor: 'ffffff',
     fontname: 'Roboto',
     fontnames: ['Roboto', 'Noto Sans', 'DejaVu Sans'],
-    outline: 2,
+    outline: 1,
     shadow: 1,
     alignment: 2,
-    marginv: 40,
+    marginv: 20,  // 40/2 = 20
     name: 'Instagram Story',
     description: 'Стиль Instagram Stories - тонкий и изящный'
   },
   
   instagram_reel: {
-    fontsize: 16,
+    fontsize: 8,  // 16/2 = 8
     fontcolor: 'ffffff',
     fontname: 'Open Sans',
     fontnames: ['Open Sans', 'Liberation Sans', 'DejaVu Sans'],
-    outline: 3,
-    shadow: 2,
+    outline: 2,
+    shadow: 1,
     bold: 1,
     alignment: 2,
-    marginv: 30,
+    marginv: 15,
     backcolour: '&H60000000',
     name: 'Instagram Reel',
     description: 'Стиль Instagram Reels - жирный и контрастный'
@@ -126,70 +126,70 @@ const SUBTITLE_STYLES = {
   
   // YouTube стили
   youtube_classic: {
-    fontsize: 14,
+    fontsize: 7,  // 14/2 = 7
     fontcolor: 'ffffff',
     fontname: 'Liberation Sans',
     fontnames: ['Source Sans Pro', 'Liberation Sans', 'Noto Sans'],
-    outline: 2,
+    outline: 1,
     shadow: 1,
     alignment: 2,
-    marginv: 25,
+    marginv: 13,  // 25/2 ≈ 13
     name: 'YouTube Classic',
     description: 'Классический YouTube - стандартные субтитры'
   },
   
   youtube_gaming: {
-    fontsize: 15,
+    fontsize: 8,  // 15/2 ≈ 8
     fontcolor: '00ff00',
     fontname: 'DejaVu Sans',
     fontnames: ['Ubuntu', 'DejaVu Sans', 'Liberation Sans'],
-    outline: 2,
+    outline: 1,
     shadow: 1,
     bold: 1,
     alignment: 2,
-    marginv: 28,
+    marginv: 14,
     name: 'YouTube Gaming',
     description: 'Игровой стиль YouTube - зеленый геймерский'
   },
   
   // Современные трендовые стили
   modern_gradient: {
-    fontsize: 17,
+    fontsize: 9,  // 17/2 ≈ 9
     fontcolor: 'ff69b4',
     fontname: 'Open Sans',
     fontnames: ['Montserrat', 'Open Sans', 'Liberation Sans'],
-    outline: 3,
-    shadow: 2,
+    outline: 2,
+    shadow: 1,
     bold: 1,
     alignment: 2,
-    marginv: 30,
+    marginv: 15,
     name: 'Modern Pink',
     description: 'Модерн розовый - трендовый цвет 2024'
   },
   
   retro_vhs: {
-    fontsize: 16,
+    fontsize: 8,  // 16/2 = 8
     fontcolor: 'ff00ff',
     fontname: 'DejaVu Sans',
     fontnames: ['Ubuntu', 'DejaVu Sans', 'Liberation Sans'],
-    outline: 2,
-    shadow: 2,
+    outline: 1,
+    shadow: 1,
     bold: 1,
     alignment: 2,
-    marginv: 28,
+    marginv: 14,
     name: 'Retro VHS',
     description: 'Ретро VHS стиль - фиолетовый винтаж'
   },
   
   minimal_black: {
-    fontsize: 13,
+    fontsize: 7,  // 13/2 ≈ 7
     fontcolor: '000000',
     fontname: 'Noto Sans',
     fontnames: ['Roboto', 'Noto Sans', 'Liberation Sans'],
     outline: 0,
     shadow: 0,
     alignment: 2,
-    marginv: 20,
+    marginv: 10,
     backcolour: '&H80ffffff',
     name: 'Minimal Black',
     description: 'Минималистичный - черный текст на белом фоне'
@@ -197,32 +197,54 @@ const SUBTITLE_STYLES = {
   
   // Премиум стили
   luxury_gold: {
-    fontsize: 18,
+    fontsize: 9,  // 18/2 = 9
     fontcolor: 'ffd700',
     fontname: 'DejaVu Sans',
     fontnames: ['Ubuntu', 'DejaVu Sans', 'Liberation Sans'],
-    outline: 3,
-    shadow: 2,
+    outline: 2,
+    shadow: 1,
     bold: 1,
     alignment: 2,
-    marginv: 32,
+    marginv: 16,
     backcolour: '&H80000000',
     name: 'Luxury Gold',
     description: 'Премиум золотой - роскошный стиль'
   },
   
   neon_purple: {
-    fontsize: 17,
+    fontsize: 9,  // 17/2 ≈ 9
     fontcolor: '9400d3',
     fontname: 'Liberation Sans',
     fontnames: ['Open Sans', 'Liberation Sans', 'Noto Sans'],
-    outline: 3,
-    shadow: 2,
+    outline: 2,
+    shadow: 1,
     bold: 1,
     alignment: 2,
-    marginv: 30,
+    marginv: 15,
     name: 'Neon Purple',
     description: 'Неоновый фиолетовый - киберпанк стиль'
+  }
+};
+
+// 📍 ПОЗИЦИИ СУБТИТРОВ
+const SUBTITLE_POSITIONS = {
+  bottom: {
+    alignment: 2,     // По центру
+    marginv: 15,      // Отступ снизу
+    name: 'Снизу',
+    description: 'Субтитры внизу экрана (стандарт)'
+  },
+  top: {
+    alignment: 8,     // По центру вверху  
+    marginv: 15,      // Отступ сверху
+    name: 'Сверху',
+    description: 'Субтитры вверху экрана'
+  },
+  center: {
+    alignment: 5,     // По центру экрана
+    marginv: 0,       // Без отступов
+    name: 'По центру',
+    description: 'Субтитры в центре экрана'
   }
 };
 
@@ -245,7 +267,7 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Новый endpoint для получения всех стилей
+// Новый endpoint для получения всех стилей и позиций
 app.get('/styles', (req, res) => {
   const stylesWithPreview = Object.keys(SUBTITLE_STYLES).map(key => {
     const style = SUBTITLE_STYLES[key];
@@ -270,12 +292,22 @@ app.get('/styles', (req, res) => {
     acc[category].push(style);
     return acc;
   }, {});
+
+  // Добавляем информацию о позициях
+  const availablePositions = Object.keys(SUBTITLE_POSITIONS).map(key => ({
+    id: key,
+    name: SUBTITLE_POSITIONS[key].name,
+    description: SUBTITLE_POSITIONS[key].description
+  }));
   
   res.json({
     success: true,
     styles: stylesWithPreview,
     grouped_styles: groupedStyles,
-    total_count: stylesWithPreview.length
+    positions: availablePositions,
+    total_styles: stylesWithPreview.length,
+    default_style: 'tiktok_classic',
+    default_position: 'bottom'
   });
 });
 
@@ -420,13 +452,15 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
     const videoBuffer = req.file.buffer;
     const rawSrtContent = req.body.srt_content;
     
-    // 🎨 НОВАЯ ЛОГИКА: получаем style_id из запроса
+    // 🎨 НОВАЯ ЛОГИКА: получаем style_id и position из запроса
     const styleId = req.body.style_id || 'tiktok_classic'; // По умолчанию TikTok Classic
+    const position = req.body.position || 'bottom'; // По умолчанию снизу
     const customStyle = req.body.custom_style ? JSON.parse(req.body.custom_style) : null;
     
     console.log(`[${taskId}] Video size: ${videoBuffer.length} bytes`);
     console.log(`[${taskId}] Raw SRT length: ${rawSrtContent.length} chars`);
     console.log(`[${taskId}] Requested style: ${styleId}`);
+    console.log(`[${taskId}] 📍 Position: ${position}`);
     
     // Выбираем стиль
     let selectedStyle;
@@ -439,6 +473,16 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
     } else {
       selectedStyle = SUBTITLE_STYLES.tiktok_classic;
       console.log(`[${taskId}] Style not found, using default: ${selectedStyle.name}`);
+    }
+
+    // 📍 Применяем позицию субтитров
+    if (SUBTITLE_POSITIONS[position]) {
+      const positionSettings = SUBTITLE_POSITIONS[position];
+      selectedStyle.alignment = positionSettings.alignment;
+      selectedStyle.marginv = positionSettings.marginv;
+      console.log(`[${taskId}] 📍 Applied position: ${positionSettings.name} (alignment: ${positionSettings.alignment})`);
+    } else {
+      console.log(`[${taskId}] ⚠️ Invalid position '${position}', using default 'bottom'`);
     }
 
     // Создаем временные файлы
@@ -619,6 +663,8 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
         style_id: customStyle ? 'custom' : styleId,
         style_name: selectedStyle.name || 'Custom Style',
         style_description: selectedStyle.description || 'Custom user style',
+        position: position,
+        position_name: SUBTITLE_POSITIONS[position]?.name || 'Снизу',
         applied_settings: selectedStyle
       }
     });
