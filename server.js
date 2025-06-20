@@ -675,5 +675,3 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
       processing_stats: {
         processing_time_ms: processingTime,
         input_size_bytes: videoBuffer.length,
-        output_size_bytes: processedVideoBuffer.length,
-        compression_ratio: (processedVideoBuffer.length / videoBuffer.length).toFixed(
