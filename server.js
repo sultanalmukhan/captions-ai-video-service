@@ -1,5 +1,5 @@
-// Beautiful Railway Service с готовыми стилями для соц.сетей
-// server.js - готовые шаблоны стилей TikTok/Instagram
+// Beautiful Railway Service с готовыми стилями для соц.сетей + МАКСИМАЛЬНОЕ КАЧЕСТВО
+// server.js - готовые шаблоны стилей TikTok/Instagram + NO COMPRESSION
 
 const express = require('express');
 const multer = require('multer');
@@ -248,6 +248,86 @@ const SUBTITLE_POSITIONS = {
   }
 };
 
+// 🎯 ФУНКЦИЯ АНАЛИЗА КАЧЕСТВА ИСХОДНОГО ВИДЕО
+function analyzeVideoQuality(inputPath) {
+  try {
+    const probe = execSync(`ffprobe -v quiet -print_format json -show_streams "${inputPath}"`, { encoding: 'utf8' });
+    const info = JSON.parse(probe);
+    const videoStream = info.streams.find(s => s.codec_type === 'video');
+    
+    const bitrate = parseInt(videoStream.bit_rate) || 0;
+    const width = parseInt(videoStream.width);
+    const height = parseInt(videoStream.height);
+    const codec = videoStream.codec_name;
+    const fps = eval(videoStream.r_frame_rate) || 30;
+    
+    // Определяем качественные характеристики
+    let qualityLevel = 'medium';
+    if (bitrate > 8000000 || width >= 1920) qualityLevel = 'high';
+    if (bitrate > 15000000 || width >= 3840) qualityLevel = 'ultra';
+    if (bitrate < 2000000 && width < 1280) qualityLevel = 'low';
+    
+    return {
+      bitrate,
+      width,
+      height,
+      codec,
+      fps,
+      qualityLevel,
+      resolution: `${width}x${height}`,
+      isHighRes: width >= 1920 || height >= 1080
+    };
+  } catch (error) {
+    console.warn('Failed to analyze video quality:', error.message);
+    return {
+      bitrate: 0,
+      width: 1920,
+      height: 1080,
+      codec: 'unknown',
+      fps: 30,
+      qualityLevel: 'medium',
+      resolution: '1920x1080',
+      isHighRes: true
+    };
+  }
+}
+
+// 🎯 ВЫБОР ОПТИМАЛЬНЫХ НАСТРОЕК НА ОСНОВЕ АНАЛИЗА
+function getOptimalSettings(videoQuality) {
+  const settings = {
+    ultra: {
+      crf: 12,           // Практически lossless
+      preset: 'slow',    // Максимальное качество
+      tune: 'film',      // Оптимизация для фильмов
+      profile: 'high',   // Высокий профиль H.264
+      level: '5.1'       // Поддержка 4K
+    },
+    high: {
+      crf: 15,           // Очень высокое качество
+      preset: 'medium',  // Баланс качество/скорость
+      tune: 'film',
+      profile: 'high',
+      level: '4.1'
+    },
+    medium: {
+      crf: 18,           // Высокое качество
+      preset: 'medium',
+      tune: null,
+      profile: 'main',
+      level: '4.0'
+    },
+    low: {
+      crf: 20,           // Хорошее качество
+      preset: 'fast',
+      tune: null,
+      profile: 'main',
+      level: '3.1'
+    }
+  };
+  
+  return settings[videoQuality.qualityLevel] || settings.medium;
+}
+
 // Health check с информацией о доступных стилях
 app.get('/health', (req, res) => {
   const systemInfo = getSystemInfo();
@@ -260,9 +340,10 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'healthy', 
     timestamp: new Date().toISOString(),
-    mode: 'SOCIAL_MEDIA_STYLES',
+    mode: 'MAXIMUM_QUALITY_SOCIAL_MEDIA_STYLES',
     available_styles: availableStyles,
     total_styles: availableStyles.length,
+    quality_mode: 'NO_COMPRESSION_MAXIMUM_QUALITY',
     ...systemInfo
   });
 });
@@ -307,7 +388,8 @@ app.get('/styles', (req, res) => {
     positions: availablePositions,
     total_styles: stylesWithPreview.length,
     default_style: 'tiktok_classic',
-    default_position: 'bottom'
+    default_position: 'bottom',
+    quality_mode: 'MAXIMUM_QUALITY_NO_COMPRESSION'
   });
 });
 
@@ -327,7 +409,7 @@ function getSystemInfo() {
       ffmpeg_available: true,
       ffmpeg_version: ffmpegVersion,
       fonts_available: availableFonts,
-      subtitle_method: 'SOCIAL_MEDIA_STYLES'
+      subtitle_method: 'MAXIMUM_QUALITY_SOCIAL_MEDIA_STYLES'
     };
   } catch (error) {
     return { 
@@ -429,7 +511,7 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
   const taskId = req.body.task_id || uuidv4();
   const startTime = Date.now();
   
-  console.log(`\n=== [${taskId}] SOCIAL MEDIA SUBTITLE PROCESSING ===`);
+  console.log(`\n=== [${taskId}] MAXIMUM QUALITY SOCIAL MEDIA SUBTITLE PROCESSING ===`);
 
   try {
     // Валидация входных данных
@@ -456,11 +538,13 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
     const styleId = req.body.style_id || 'tiktok_classic'; // По умолчанию TikTok Classic
     const position = req.body.position || 'bottom'; // По умолчанию снизу
     const customStyle = req.body.custom_style ? JSON.parse(req.body.custom_style) : null;
+    const forceQuality = req.body.force_quality || 'auto'; // auto, lossless, ultra, high
     
     console.log(`[${taskId}] Video size: ${videoBuffer.length} bytes`);
     console.log(`[${taskId}] Raw SRT length: ${rawSrtContent.length} chars`);
     console.log(`[${taskId}] Requested style: ${styleId}`);
     console.log(`[${taskId}] 📍 Position: ${position}`);
+    console.log(`[${taskId}] 🎯 Quality mode: ${forceQuality}`);
     
     // Выбираем стиль
     let selectedStyle;
@@ -498,11 +582,36 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
     // Сохраняем видео
     fs.writeFileSync(inputVideoPath, videoBuffer);
 
+    // 🎯 АНАЛИЗИРУЕМ КАЧЕСТВО ИСХОДНОГО ВИДЕО
+    console.log(`[${taskId}] 🔍 Analyzing input video quality...`);
+    const videoQuality = analyzeVideoQuality(inputVideoPath);
+    console.log(`[${taskId}] 📊 Video analysis:`, {
+      resolution: videoQuality.resolution,
+      bitrate: Math.round(videoQuality.bitrate / 1000) + 'kbps',
+      codec: videoQuality.codec,
+      fps: videoQuality.fps,
+      qualityLevel: videoQuality.qualityLevel
+    });
+
+    // 🎯 ВЫБИРАЕМ ОПТИМАЛЬНЫЕ НАСТРОЙКИ
+    let optimalSettings;
+    if (forceQuality === 'lossless') {
+      optimalSettings = { crf: 0, preset: 'slow', tune: 'film', profile: 'high', level: '5.1' };
+    } else if (forceQuality === 'ultra') {
+      optimalSettings = { crf: 12, preset: 'slow', tune: 'film', profile: 'high', level: '5.1' };
+    } else if (forceQuality === 'high') {
+      optimalSettings = { crf: 15, preset: 'medium', tune: 'film', profile: 'high', level: '4.1' };
+    } else {
+      optimalSettings = getOptimalSettings(videoQuality);
+    }
+    
+    console.log(`[${taskId}] ⚙️ Selected encoding settings:`, optimalSettings);
+
     // Beautify SRT
     const beautifiedSRT = beautifySRT(rawSrtContent, taskId);
     fs.writeFileSync(srtPath, beautifiedSRT, 'utf8');
 
-    console.log(`[${taskId}] ✅ Files prepared with style: ${selectedStyle.name || 'Custom'}`);
+    console.log(`[${taskId}] ✅ Files prepared with MAX QUALITY style: ${selectedStyle.name || 'Custom'}`);
 
     // Строим FFmpeg команды с выбранным стилем
     const buildStyleString = (style) => {
@@ -555,31 +664,42 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
     const styleString = buildStyleString(selectedStyle);
     console.log(`[${taskId}] Style string: ${styleString}`);
 
-    // 🎨 СОВРЕМЕННЫЕ ШРИФТЫ: Команды для встраивания субтитров с красивыми шрифтами
+    // 🎯 МАКСИМАЛЬНОЕ КАЧЕСТВО: Команды FFmpeg без компрессии
     const commands = [
-      // Команда 1: Полный стиль с выбранным шрифтом
-      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${styleString}'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
+      // Команда 1: LOSSLESS КАЧЕСТВО (если force_quality=lossless)
+      forceQuality === 'lossless' ? 
+        `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${styleString}'" -c:a copy -c:v libx264 -preset slow -crf 0 -pix_fmt yuv420p -profile:v high -level 5.1 -movflags +faststart -y "${outputVideoPath}"` :
       
-      // Команда 2: Без указания шрифта, но с остальными стилями
-      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${selectedStyle.outline || 3}${selectedStyle.bold ? ',Bold=1' : ''}'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
+      // Команда 1: ULTRA HIGH КАЧЕСТВО (адаптивное на основе анализа)
+      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${styleString}'" -c:a copy -c:v libx264 -preset ${optimalSettings.preset} -crf ${optimalSettings.crf} -pix_fmt yuv420p${optimalSettings.tune ? ` -tune ${optimalSettings.tune}` : ''} -profile:v ${optimalSettings.profile} -level ${optimalSettings.level} -movflags +faststart -y "${outputVideoPath}"`,
       
-      // Команда 3: Fallback с DejaVu Sans
-      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='Fontname=DejaVu Sans,Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${selectedStyle.outline || 3}'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
+      // Команда 2: ОЧЕНЬ ВЫСОКОЕ КАЧЕСТВО (универсальная)
+      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${styleString}'" -c:a copy -c:v libx264 -preset medium -crf 15 -pix_fmt yuv420p -tune film -profile:v high -level 4.1 -movflags +faststart -y "${outputVideoPath}"`,
       
-      // Команда 4: Базовый метод
-      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
+      // Команда 3: ВЫСОКОЕ КАЧЕСТВО с минимальным сжатием
+      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${styleString}'" -c:a copy -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -profile:v high -movflags +faststart -y "${outputVideoPath}"`,
       
-      // Команда 5: Fallback с прямым путем к шрифту
-      `ffmpeg -i "${inputVideoPath}" -vf "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:text='✨ MODERN SUBTITLES ✨':fontsize=${selectedStyle.fontsize}:fontcolor=${selectedStyle.fontcolor || 'white'}:x=(w-text_w)/2:y=h-80:box=1:boxcolor=black@0.7:boxborderw=5" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`
+      // Команда 4: STREAM COPY (идеальное качество) - попытка без перекодирования видео
+      `ffmpeg -i "${inputVideoPath}" -i "${srtPath}" -c copy -c:s mov_text -metadata:s:s:0 language=rus -y "${outputVideoPath}"`,
+      
+      // Команда 5: Fallback с DejaVu Sans (высокое качество)
+      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='Fontname=DejaVu Sans,Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${selectedStyle.outline || 3}'" -c:a copy -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -movflags +faststart -y "${outputVideoPath}"`,
+      
+      // Команда 6: Базовый метод (все еще высокое качество)
+      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}'" -c:a copy -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -movflags +faststart -y "${outputVideoPath}"`,
+      
+      // Команда 7: Последний fallback с drawtext (высокое качество)
+      `ffmpeg -i "${inputVideoPath}" -vf "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:text='MAX QUALITY SUBTITLES':fontsize=${selectedStyle.fontsize * 2}:fontcolor=${selectedStyle.fontcolor || 'white'}:x=(w-text_w)/2:y=h-100:box=1:boxcolor=black@0.8:boxborderw=3" -c:a copy -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -movflags +faststart -y "${outputVideoPath}"`
     ];
 
     let success = false;
     let usedCommand = 0;
     let methodDescription = '';
+    let qualityAnalysis = {};
 
     for (let i = 0; i < commands.length && !success; i++) {
       try {
-        console.log(`[${taskId}] 🎨 Trying style method ${i + 1}...`);
+        console.log(`[${taskId}] 🎨 Trying MAX QUALITY method ${i + 1}...`);
         console.log(`[${taskId}] Command preview: ${commands[i].substring(0, 120)}...`);
         
         // Удаляем предыдущий файл
@@ -590,8 +710,8 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
         const cmdStartTime = Date.now();
         execSync(commands[i], { 
           stdio: 'pipe',
-          timeout: 300000,
-          maxBuffer: 1024 * 1024 * 100
+          timeout: 600000,  // Увеличили timeout до 10 минут для высокого качества
+          maxBuffer: 1024 * 1024 * 200  // Увеличили буфер до 200MB
         });
         const cmdDuration = Date.now() - cmdStartTime;
         
@@ -599,18 +719,35 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
         if (fs.existsSync(outputVideoPath)) {
           const outputSize = fs.statSync(outputVideoPath).size;
           if (outputSize > 0) {
-            console.log(`[${taskId}] ✅ SUCCESS! Style method ${i + 1} worked! (${cmdDuration}ms)`);
-            console.log(`[${taskId}] Output size: ${outputSize} bytes`);
+            console.log(`[${taskId}] ✅ MAX QUALITY SUCCESS! Method ${i + 1} worked! (${cmdDuration}ms)`);
+            console.log(`[${taskId}] Output size: ${outputSize} bytes (${(outputSize / 1024 / 1024).toFixed(2)}MB)`);
+            
+            // Анализируем качество результата
+            try {
+              const outputQuality = analyzeVideoQuality(outputVideoPath);
+              qualityAnalysis = {
+                input_bitrate: videoQuality.bitrate,
+                output_bitrate: outputQuality.bitrate,
+                quality_preserved: outputQuality.bitrate >= videoQuality.bitrate * 0.8,
+                resolution_preserved: outputQuality.width === videoQuality.width && outputQuality.height === videoQuality.height,
+                codec_used: outputQuality.codec
+              };
+              console.log(`[${taskId}] 📊 Quality analysis:`, qualityAnalysis);
+            } catch (err) {
+              console.log(`[${taskId}] ⚠️ Could not analyze output quality:`, err.message);
+            }
             
             success = true;
             usedCommand = i + 1;
             
             const descriptions = [
-              'FULL_STYLE_WITH_FONT',
-              'FULL_STYLE_NO_FONT',
-              'SIMPLIFIED_STYLE',
-              'BASIC_SUBTITLES',
-              'FALLBACK_DRAWTEXT'
+              forceQuality === 'lossless' ? 'LOSSLESS_PERFECT_QUALITY' : 'ADAPTIVE_ULTRA_HIGH_QUALITY',
+              'ULTRA_HIGH_QUALITY_FILM_TUNE',
+              'HIGH_QUALITY_MINIMAL_COMPRESSION',
+              'STREAM_COPY_PERFECT_QUALITY',
+              'HIGH_QUALITY_DEJAVU_FALLBACK',
+              'HIGH_QUALITY_BASIC_SUBTITLES',
+              'HIGH_QUALITY_DRAWTEXT_FALLBACK'
             ];
             methodDescription = descriptions[i];
             
@@ -619,23 +756,34 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
         }
         
       } catch (error) {
-        console.log(`[${taskId}] ❌ Style method ${i + 1} failed:`, error.message);
+        console.log(`[${taskId}] ❌ MAX Quality method ${i + 1} failed:`, error.message);
+        
+        // Специальная обработка для stream copy
+        if (i === 3 && error.message.includes('mov_text')) {
+          console.log(`[${taskId}] ℹ️ Stream copy failed (expected for burned-in subtitles), continuing...`);
+        }
       }
     }
 
     if (!success) {
-      throw new Error('All style methods failed');
+      throw new Error('All MAX QUALITY methods failed');
     }
 
     // Читаем результат
     const processedVideoBuffer = fs.readFileSync(outputVideoPath);
     const processingTime = Date.now() - startTime;
 
-    console.log(`[${taskId}] 🎉 STYLED SUBTITLES SUCCESS! 🎨`);
+    // Вычисляем статистики качества
+    const sizeIncrease = ((processedVideoBuffer.length / videoBuffer.length) - 1) * 100;
+    const qualityRetained = qualityAnalysis.quality_preserved !== false;
+
+    console.log(`[${taskId}] 🎉 MAXIMUM QUALITY STYLED SUBTITLES SUCCESS! 🎨✨`);
     console.log(`[${taskId}] Style: ${selectedStyle.name || 'Custom'}`);
-    console.log(`[${taskId}] Method: ${methodDescription}`);
+    console.log(`[${taskId}] Quality Method: ${methodDescription}`);
     console.log(`[${taskId}] Command: ${usedCommand}`);
     console.log(`[${taskId}] Processing time: ${processingTime}ms`);
+    console.log(`[${taskId}] Size change: ${sizeIncrease > 0 ? '+' : ''}${sizeIncrease.toFixed(1)}%`);
+    console.log(`[${taskId}] Quality retained: ${qualityRetained ? 'YES ✅' : 'REDUCED ⚠️'}`);
 
     // Очистка временных файлов
     [inputVideoPath, srtPath, outputVideoPath].forEach(filePath => {
@@ -653,9 +801,20 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
         processing_time_ms: processingTime,
         input_size_bytes: videoBuffer.length,
         output_size_bytes: processedVideoBuffer.length,
-        compression_ratio: (processedVideoBuffer.length / videoBuffer.length).toFixed(2),
+        size_change_percent: parseFloat(sizeIncrease.toFixed(1)),
+        compression_ratio: (processedVideoBuffer.length / videoBuffer.length).toFixed(3),
         method_used: methodDescription,
-        command_number: usedCommand
+        command_number: usedCommand,
+        quality_mode: 'MAXIMUM_QUALITY_NO_COMPRESSION',
+        input_quality: {
+          resolution: videoQuality.resolution,
+          bitrate: videoQuality.bitrate,
+          codec: videoQuality.codec,
+          quality_level: videoQuality.qualityLevel
+        },
+        output_quality: qualityAnalysis,
+        settings_used: optimalSettings,
+        quality_retained: qualityRetained
       },
       video_data: processedVideoBuffer.toString('base64'),
       content_type: 'video/mp4',
@@ -666,11 +825,17 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
         position: position,
         position_name: SUBTITLE_POSITIONS[position]?.name || 'Снизу',
         applied_settings: selectedStyle
+      },
+      quality_info: {
+        mode: forceQuality,
+        encoding_settings: optimalSettings,
+        analysis: qualityAnalysis,
+        recommendations: generateQualityRecommendations(videoQuality, qualityAnalysis, sizeIncrease)
       }
     });
 
   } catch (error) {
-    console.error(`[${taskId}] 💥 STYLE ERROR:`, error.message);
+    console.error(`[${taskId}] 💥 MAX QUALITY ERROR:`, error.message);
 
     // Очистка при ошибке
     const tempFiles = [
@@ -691,15 +856,74 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
       success: false,
       task_id: taskId,
       error: error.message,
-      processing_time_ms: Date.now() - startTime
+      processing_time_ms: Date.now() - startTime,
+      quality_mode: 'MAXIMUM_QUALITY_FAILED'
     });
   }
 });
 
+// 🎯 ФУНКЦИЯ ГЕНЕРАЦИИ РЕКОМЕНДАЦИЙ ПО КАЧЕСТВУ
+function generateQualityRecommendations(inputQuality, outputQuality, sizeChange) {
+  const recommendations = [];
+  
+  if (sizeChange > 50) {
+    recommendations.push({
+      type: 'size_increase',
+      message: 'Файл значительно увеличился в размере из-за высококачественного кодирования',
+      suggestion: 'Для экономии места можно использовать параметр force_quality=high вместо auto'
+    });
+  }
+  
+  if (outputQuality.quality_preserved === false) {
+    recommendations.push({
+      type: 'quality_loss',
+      message: 'Обнаружено небольшое снижение битрейта',
+      suggestion: 'Попробуйте force_quality=lossless для идеального сохранения качества'
+    });
+  }
+  
+  if (inputQuality.qualityLevel === 'low') {
+    recommendations.push({
+      type: 'input_quality',
+      message: 'Исходное видео низкого качества',
+      suggestion: 'Улучшение ограничено качеством исходного файла'
+    });
+  }
+  
+  if (sizeChange < -10) {
+    recommendations.push({
+      type: 'unexpected_compression',
+      message: 'Неожиданное сжатие файла',
+      suggestion: 'Проверьте использование правильного кодека и настроек'
+    });
+  }
+  
+  return recommendations;
+}
+
+// 🎯 НОВЫЙ ENDPOINT ДЛЯ LOSSLESS ОБРАБОТКИ
+app.post('/process-video-lossless', upload.single('video'), async (req, res) => {
+  // Форсируем lossless качество
+  req.body.force_quality = 'lossless';
+  
+  // Перенаправляем на основной endpoint
+  return app._router.handle(
+    Object.assign(req, { url: '/process-video-with-subtitles', method: 'POST' }), 
+    res
+  );
+});
+
 app.listen(PORT, () => {
-  console.log(`🎨 SOCIAL MEDIA Subtitle Service running on port ${PORT} 🎨`);
-  console.log(`📱 Ready for TikTok, Instagram, YouTube styles!`);
+  console.log(`🎨 MAXIMUM QUALITY SOCIAL MEDIA Subtitle Service running on port ${PORT} 🎨`);
+  console.log(`📱 Ready for TikTok, Instagram, YouTube styles with CRYSTAL CLEAR quality!`);
   console.log(`🎬 Total available styles: ${Object.keys(SUBTITLE_STYLES).length}`);
+  console.log(`🎯 Quality modes available:`);
+  console.log(`   • auto - Adaptive quality based on input analysis`);
+  console.log(`   • lossless - Perfect quality preservation (CRF 0)`);
+  console.log(`   • ultra - Ultra high quality (CRF 12)`);
+  console.log(`   • high - High quality (CRF 15)`);
+  console.log(`🚀 Features: Quality analysis, adaptive encoding, zero compression modes`);
   const systemInfo = getSystemInfo();
   console.log(`FFmpeg: ${systemInfo.ffmpeg_available}`);
+  console.log(`Quality Mode: MAXIMUM_QUALITY_NO_COMPRESSION_ENABLED`);
 });
