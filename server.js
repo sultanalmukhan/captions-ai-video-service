@@ -1,5 +1,5 @@
-// Beautiful Railway Service с готовыми стилями для соц.сетей
-// server.js - готовые шаблоны стилей TikTok/Instagram
+// Beautiful Railway Service с готовыми стилями для соц.сетей + ВЫСОКОЕ КАЧЕСТВО ТЕКСТА
+// server.js - готовые шаблоны стилей TikTok/Instagram + HQ рендеринг
 
 const express = require('express');
 const multer = require('multer');
@@ -35,194 +35,194 @@ const upload = multer({
   }
 });
 
-// 🎨 ГОТОВЫЕ СТИЛИ ДЛЯ СОЦИАЛЬНЫХ СЕТЕЙ (КОМПАКТНЫЕ РАЗМЕРЫ + УМНЫЕ FALLBACK ШРИФТЫ)
+// 🎨 ГОТОВЫЕ СТИЛИ ДЛЯ СОЦИАЛЬНЫХ СЕТЕЙ (ВЫСОКОЕ КАЧЕСТВО + УМНЫЕ FALLBACK ШРИФТЫ)
 const SUBTITLE_STYLES = {
-  // TikTok стили  
+  // TikTok стили - ВЫСОКОЕ КАЧЕСТВО
   tiktok_classic: {
-    fontsize: 8,  // 16/2 = 8
-    fontcolor: 'white',
-    fontname: 'DejaVu Sans',
-    fontnames: ['Ubuntu', 'Liberation Sans', 'DejaVu Sans'],
-    outline: 2,   // Уменьшили обводку
-    shadow: 1,    // Уменьшили тень
+    fontsize: 16,  // Увеличено с 8 до 16
+    fontcolor: 'ffffff',
+    fontname: 'DejaVu Sans-Bold',
+    fontnames: ['Ubuntu-Bold', 'Liberation Sans-Bold', 'DejaVu Sans-Bold'],
+    outline: 4,   // Увеличено с 2 до 4
+    shadow: 2,    // Увеличено с 1 до 2
     bold: 1,
     alignment: 2,
-    marginv: 15,  // Уменьшили отступ
+    marginv: 30,  // Увеличено с 15 до 30
     backcolour: '&H80000000',
-    name: 'TikTok Classic',
-    description: 'Классический TikTok - белый жирный текст с черным фоном'
+    name: 'TikTok Classic HQ',
+    description: 'Классический TikTok - белый жирный текст с черным фоном (высокое качество)'
   },
   
   tiktok_neon: {
-    fontsize: 9,  // 18/2 = 9
+    fontsize: 18,  // Увеличено с 9 до 18
     fontcolor: '00ffff',
-    fontname: 'Liberation Sans',
-    fontnames: ['Roboto', 'Liberation Sans', 'Noto Sans'],
-    outline: 2,
-    shadow: 1,
+    fontname: 'Liberation Sans-Bold',
+    fontnames: ['Roboto-Bold', 'Liberation Sans-Bold', 'Noto Sans-Bold'],
+    outline: 5,
+    shadow: 3,
     bold: 1,
     alignment: 2,
-    marginv: 13,  // 25/2 ≈ 13
-    name: 'TikTok Neon',
-    description: 'Неоновый TikTok стиль - яркий голубой с сильной обводкой'
+    marginv: 35,  // Увеличено
+    name: 'TikTok Neon HQ',
+    description: 'Неоновый TikTok стиль - яркий голубой с сильной обводкой (HQ)'
   },
   
   tiktok_yellow: {
-    fontsize: 9,  // 17/2 ≈ 9
+    fontsize: 18,  // Увеличено
     fontcolor: 'ffff00',
-    fontname: 'Ubuntu',
-    fontnames: ['Ubuntu', 'Open Sans', 'DejaVu Sans'],
-    outline: 2,
-    shadow: 1,
+    fontname: 'Ubuntu-Bold',
+    fontnames: ['Ubuntu-Bold', 'Open Sans-Bold', 'DejaVu Sans-Bold'],
+    outline: 5,
+    shadow: 3,
     bold: 1,
     alignment: 2,
-    marginv: 15,
-    name: 'TikTok Yellow',
-    description: 'Желтый TikTok стиль - как у популярных блогеров'
+    marginv: 30,
+    name: 'TikTok Yellow HQ',
+    description: 'Желтый TikTok стиль - как у популярных блогеров (HQ)'
   },
   
-  // Instagram стили
+  // Instagram стили - ВЫСОКОЕ КАЧЕСТВО
   instagram_clean: {
-    fontsize: 8,  // 15/2 ≈ 8
+    fontsize: 15,  // Увеличено с 8 до 15
     fontcolor: 'ffffff',
-    fontname: 'Noto Sans',
-    fontnames: ['Noto Sans', 'Open Sans', 'Liberation Sans'],
-    outline: 1,
-    shadow: 1,
+    fontname: 'Noto Sans-Bold',
+    fontnames: ['Noto Sans-Bold', 'Open Sans-Bold', 'Liberation Sans-Bold'],
+    outline: 3,
+    shadow: 2,
     alignment: 2,
-    marginv: 18,  // 35/2 ≈ 18
-    backcolour: '&H40000000',
-    name: 'Instagram Clean',
-    description: 'Чистый Instagram стиль - элегантный белый текст'
+    marginv: 40,  // Увеличено
+    backcolour: '&H60000000',
+    name: 'Instagram Clean HQ',
+    description: 'Чистый Instagram стиль - элегантный белый текст (HQ)'
   },
   
   instagram_story: {
-    fontsize: 7,  // 14/2 = 7
+    fontsize: 14,  // Увеличено с 7 до 14
     fontcolor: 'ffffff',
-    fontname: 'Roboto',
-    fontnames: ['Roboto', 'Noto Sans', 'DejaVu Sans'],
-    outline: 1,
-    shadow: 1,
+    fontname: 'Roboto-Bold',
+    fontnames: ['Roboto-Bold', 'Noto Sans-Bold', 'DejaVu Sans-Bold'],
+    outline: 3,
+    shadow: 2,
     alignment: 2,
-    marginv: 20,  // 40/2 = 20
-    name: 'Instagram Story',
-    description: 'Стиль Instagram Stories - тонкий и изящный'
+    marginv: 45,  // Увеличено
+    name: 'Instagram Story HQ',
+    description: 'Стиль Instagram Stories - тонкий и изящный (HQ)'
   },
   
   instagram_reel: {
-    fontsize: 8,  // 16/2 = 8
+    fontsize: 16,  // Увеличено с 8 до 16
     fontcolor: 'ffffff',
-    fontname: 'Open Sans',
-    fontnames: ['Open Sans', 'Liberation Sans', 'DejaVu Sans'],
-    outline: 2,
-    shadow: 1,
+    fontname: 'Open Sans-Bold',
+    fontnames: ['Open Sans-Bold', 'Liberation Sans-Bold', 'DejaVu Sans-Bold'],
+    outline: 4,
+    shadow: 3,
     bold: 1,
     alignment: 2,
-    marginv: 15,
-    backcolour: '&H60000000',
-    name: 'Instagram Reel',
-    description: 'Стиль Instagram Reels - жирный и контрастный'
+    marginv: 30,
+    backcolour: '&H80000000',
+    name: 'Instagram Reel HQ',
+    description: 'Стиль Instagram Reels - жирный и контрастный (HQ)'
   },
   
-  // YouTube стили
+  // YouTube стили - ВЫСОКОЕ КАЧЕСТВО
   youtube_classic: {
-    fontsize: 7,  // 14/2 = 7
+    fontsize: 14,  // Увеличено с 7 до 14
     fontcolor: 'ffffff',
-    fontname: 'Liberation Sans',
-    fontnames: ['Source Sans Pro', 'Liberation Sans', 'Noto Sans'],
-    outline: 1,
-    shadow: 1,
+    fontname: 'Liberation Sans-Bold',
+    fontnames: ['Source Sans Pro-Bold', 'Liberation Sans-Bold', 'Noto Sans-Bold'],
+    outline: 3,
+    shadow: 2,
     alignment: 2,
-    marginv: 13,  // 25/2 ≈ 13
-    name: 'YouTube Classic',
-    description: 'Классический YouTube - стандартные субтитры'
+    marginv: 35,  // Увеличено
+    name: 'YouTube Classic HQ',
+    description: 'Классический YouTube - стандартные субтитры (HQ)'
   },
   
   youtube_gaming: {
-    fontsize: 8,  // 15/2 ≈ 8
+    fontsize: 16,  // Увеличено с 8 до 16
     fontcolor: '00ff00',
-    fontname: 'DejaVu Sans',
-    fontnames: ['Ubuntu', 'DejaVu Sans', 'Liberation Sans'],
-    outline: 1,
-    shadow: 1,
+    fontname: 'DejaVu Sans-Bold',
+    fontnames: ['Ubuntu-Bold', 'DejaVu Sans-Bold', 'Liberation Sans-Bold'],
+    outline: 4,
+    shadow: 3,
     bold: 1,
     alignment: 2,
-    marginv: 14,
-    name: 'YouTube Gaming',
-    description: 'Игровой стиль YouTube - зеленый геймерский'
+    marginv: 32,
+    name: 'YouTube Gaming HQ',
+    description: 'Игровой стиль YouTube - зеленый геймерский (HQ)'
   },
   
-  // Современные трендовые стили
+  // Современные трендовые стили - ВЫСОКОЕ КАЧЕСТВО
   modern_gradient: {
-    fontsize: 9,  // 17/2 ≈ 9
+    fontsize: 18,  // Увеличено
     fontcolor: 'ff69b4',
-    fontname: 'Open Sans',
-    fontnames: ['Montserrat', 'Open Sans', 'Liberation Sans'],
-    outline: 2,
-    shadow: 1,
+    fontname: 'Open Sans-Bold',
+    fontnames: ['Montserrat-Bold', 'Open Sans-Bold', 'Liberation Sans-Bold'],
+    outline: 5,
+    shadow: 3,
     bold: 1,
     alignment: 2,
-    marginv: 15,
-    name: 'Modern Pink',
-    description: 'Модерн розовый - трендовый цвет 2024'
+    marginv: 30,
+    name: 'Modern Pink HQ',
+    description: 'Модерн розовый - трендовый цвет 2024 (HQ)'
   },
   
   retro_vhs: {
-    fontsize: 8,  // 16/2 = 8
+    fontsize: 16,  // Увеличено
     fontcolor: 'ff00ff',
-    fontname: 'DejaVu Sans',
-    fontnames: ['Ubuntu', 'DejaVu Sans', 'Liberation Sans'],
-    outline: 1,
-    shadow: 1,
+    fontname: 'DejaVu Sans-Bold',
+    fontnames: ['Ubuntu-Bold', 'DejaVu Sans-Bold', 'Liberation Sans-Bold'],
+    outline: 4,
+    shadow: 3,
     bold: 1,
     alignment: 2,
-    marginv: 14,
-    name: 'Retro VHS',
-    description: 'Ретро VHS стиль - фиолетовый винтаж'
+    marginv: 32,
+    name: 'Retro VHS HQ',
+    description: 'Ретро VHS стиль - фиолетовый винтаж (HQ)'
   },
   
   minimal_black: {
-    fontsize: 7,  // 13/2 ≈ 7
+    fontsize: 14,  // Увеличено
     fontcolor: '000000',
-    fontname: 'Noto Sans',
-    fontnames: ['Roboto', 'Noto Sans', 'Liberation Sans'],
+    fontname: 'Noto Sans-Bold',
+    fontnames: ['Roboto-Bold', 'Noto Sans-Bold', 'Liberation Sans-Bold'],
     outline: 0,
     shadow: 0,
     alignment: 2,
-    marginv: 10,
+    marginv: 25,
     backcolour: '&H80ffffff',
-    name: 'Minimal Black',
-    description: 'Минималистичный - черный текст на белом фоне'
+    name: 'Minimal Black HQ',
+    description: 'Минималистичный - черный текст на белом фоне (HQ)'
   },
   
-  // Премиум стили
+  // Премиум стили - ВЫСОКОЕ КАЧЕСТВО
   luxury_gold: {
-    fontsize: 9,  // 18/2 = 9
+    fontsize: 18,  // Увеличено
     fontcolor: 'ffd700',
-    fontname: 'DejaVu Sans',
-    fontnames: ['Ubuntu', 'DejaVu Sans', 'Liberation Sans'],
-    outline: 2,
-    shadow: 1,
+    fontname: 'DejaVu Sans-Bold',
+    fontnames: ['Ubuntu-Bold', 'DejaVu Sans-Bold', 'Liberation Sans-Bold'],
+    outline: 5,
+    shadow: 3,
     bold: 1,
     alignment: 2,
-    marginv: 16,
+    marginv: 35,
     backcolour: '&H80000000',
-    name: 'Luxury Gold',
-    description: 'Премиум золотой - роскошный стиль'
+    name: 'Luxury Gold HQ',
+    description: 'Премиум золотой - роскошный стиль (HQ)'
   },
   
   neon_purple: {
-    fontsize: 9,  // 17/2 ≈ 9
+    fontsize: 18,  // Увеличено
     fontcolor: '9400d3',
-    fontname: 'Liberation Sans',
-    fontnames: ['Open Sans', 'Liberation Sans', 'Noto Sans'],
-    outline: 2,
-    shadow: 1,
+    fontname: 'Liberation Sans-Bold',
+    fontnames: ['Open Sans-Bold', 'Liberation Sans-Bold', 'Noto Sans-Bold'],
+    outline: 5,
+    shadow: 3,
     bold: 1,
     alignment: 2,
-    marginv: 15,
-    name: 'Neon Purple',
-    description: 'Неоновый фиолетовый - киберпанк стиль'
+    marginv: 30,
+    name: 'Neon Purple HQ',
+    description: 'Неоновый фиолетовый - киберпанк стиль (HQ)'
   }
 };
 
@@ -230,13 +230,13 @@ const SUBTITLE_STYLES = {
 const SUBTITLE_POSITIONS = {
   bottom: {
     alignment: 2,     // По центру
-    marginv: 15,      // Отступ снизу
+    marginv: 30,      // Увеличенный отступ снизу
     name: 'Снизу',
     description: 'Субтитры внизу экрана (стандарт)'
   },
   top: {
     alignment: 8,     // По центру вверху  
-    marginv: 15,      // Отступ сверху
+    marginv: 30,      // Увеличенный отступ сверху
     name: 'Сверху',
     description: 'Субтитры вверху экрана'
   },
@@ -247,6 +247,87 @@ const SUBTITLE_POSITIONS = {
     description: 'Субтитры в центре экрана'
   }
 };
+
+// 🎯 ФУНКЦИЯ ОПРЕДЕЛЕНИЯ ФОРМАТА ВИДЕО
+function detectVideoFormat(inputPath) {
+  try {
+    const probe = execSync(`ffprobe -v quiet -print_format json -show_streams "${inputPath}"`, { encoding: 'utf8' });
+    const info = JSON.parse(probe);
+    const videoStream = info.streams.find(s => s.codec_type === 'video');
+    
+    const width = parseInt(videoStream.width);
+    const height = parseInt(videoStream.height);
+    const ratio = width / height;
+    
+    if (ratio < 0.7) return 'vertical';    // 9:16 или более вертикальный
+    if (ratio > 1.5) return 'horizontal'; // 16:9 или более горизонтальный
+    return 'square';                      // Примерно 1:1
+  } catch (error) {
+    return 'unknown';
+  }
+}
+
+// 🎯 ФУНКЦИЯ ДЛЯ СОЗДАНИЯ ВЫСОКОКАЧЕСТВЕННЫХ СТИЛЕЙ
+function buildHighQualityStyle(style) {
+  // Увеличиваем все размеры в 1.5 раза для лучшего качества
+  let styleStr = `Fontsize=${Math.round(style.fontsize * 1.5)}`;
+  
+  // Добавляем сглаживание шрифтов - пробуем жирную версию
+  if (style.fontname) {
+    styleStr += `,Fontname=${style.fontname}`;
+  }
+  
+  // Цвет с правильным форматированием
+  if (style.fontcolor) {
+    const color = style.fontcolor.startsWith('&H') ? style.fontcolor : `&H${style.fontcolor}`;
+    styleStr += `,PrimaryColour=${color}`;
+  }
+  
+  // Увеличенная обводка для четкости
+  if (style.outline) {
+    styleStr += `,OutlineColour=&H000000,Outline=${Math.round(style.outline * 1.5)}`;
+  }
+  
+  // Мягкая тень для глубины
+  if (style.shadow) {
+    styleStr += `,Shadow=${Math.round(style.shadow * 1.5)}`;
+  }
+  
+  // Всегда включаем жирность для мобильных
+  styleStr += `,Bold=1`;
+  
+  // Выравнивание
+  if (style.alignment) {
+    styleStr += `,Alignment=${style.alignment}`;
+  }
+  
+  // Увеличенные отступы
+  if (style.marginv) {
+    styleStr += `,MarginV=${Math.round(style.marginv * 1.2)}`;
+  }
+  
+  // Фон с прозрачностью
+  if (style.backcolour) {
+    styleStr += `,BackColour=${style.backcolour}`;
+  }
+  
+  return styleStr;
+}
+
+// 🎯 ФУНКЦИЯ ДЛЯ СОЗДАНИЯ ТЕКСТОВОГО ФАЙЛА ИЗ SRT
+function createTextFile(srtContent, taskId) {
+  const textPath = `/tmp/processing/text_${taskId}.txt`;
+  
+  // Извлекаем только текст из SRT (без временных меток)
+  const textOnly = srtContent
+    .replace(/^\d+$/gm, '')  // Убираем номера
+    .replace(/\d{2}:\d{2}:\d{2},\d{3} --> \d{2}:\d{2}:\d{2},\d{3}/g, '') // Убираем временные метки
+    .replace(/\n\n+/g, ' ')  // Заменяем множественные переносы на пробелы
+    .trim();
+  
+  fs.writeFileSync(textPath, textOnly, 'utf8');
+  return textPath;
+}
 
 // Health check с информацией о доступных стилях
 app.get('/health', (req, res) => {
@@ -260,7 +341,7 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'healthy', 
     timestamp: new Date().toISOString(),
-    mode: 'SOCIAL_MEDIA_STYLES',
+    mode: 'HIGH_QUALITY_SOCIAL_MEDIA_STYLES',
     available_styles: availableStyles,
     total_styles: availableStyles.length,
     ...systemInfo
@@ -307,7 +388,8 @@ app.get('/styles', (req, res) => {
     positions: availablePositions,
     total_styles: stylesWithPreview.length,
     default_style: 'tiktok_classic',
-    default_position: 'bottom'
+    default_position: 'bottom',
+    quality_mode: 'HIGH_QUALITY_RENDERING'
   });
 });
 
@@ -327,7 +409,7 @@ function getSystemInfo() {
       ffmpeg_available: true,
       ffmpeg_version: ffmpegVersion,
       fonts_available: availableFonts,
-      subtitle_method: 'SOCIAL_MEDIA_STYLES'
+      subtitle_method: 'HIGH_QUALITY_SOCIAL_MEDIA_STYLES'
     };
   } catch (error) {
     return { 
@@ -429,7 +511,7 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
   const taskId = req.body.task_id || uuidv4();
   const startTime = Date.now();
   
-  console.log(`\n=== [${taskId}] SOCIAL MEDIA SUBTITLE PROCESSING ===`);
+  console.log(`\n=== [${taskId}] HIGH QUALITY SOCIAL MEDIA SUBTITLE PROCESSING ===`);
 
   try {
     // Валидация входных данных
@@ -456,11 +538,13 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
     const styleId = req.body.style_id || 'tiktok_classic'; // По умолчанию TikTok Classic
     const position = req.body.position || 'bottom'; // По умолчанию снизу
     const customStyle = req.body.custom_style ? JSON.parse(req.body.custom_style) : null;
+    const enableHighQuality = req.body.high_quality !== 'false'; // По умолчанию включено
     
     console.log(`[${taskId}] Video size: ${videoBuffer.length} bytes`);
     console.log(`[${taskId}] Raw SRT length: ${rawSrtContent.length} chars`);
     console.log(`[${taskId}] Requested style: ${styleId}`);
     console.log(`[${taskId}] 📍 Position: ${position}`);
+    console.log(`[${taskId}] 🎯 High Quality Mode: ${enableHighQuality}`);
     
     // Выбираем стиль
     let selectedStyle;
@@ -498,11 +582,16 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
     // Сохраняем видео
     fs.writeFileSync(inputVideoPath, videoBuffer);
 
+    // 🎯 Определяем формат видео для оптимизации
+    console.log(`[${taskId}] 🎯 Detecting video format for optimal quality...`);
+    const videoFormat = detectVideoFormat(inputVideoPath);
+    console.log(`[${taskId}] 📱 Video format detected: ${videoFormat}`);
+
     // Beautify SRT
     const beautifiedSRT = beautifySRT(rawSrtContent, taskId);
     fs.writeFileSync(srtPath, beautifiedSRT, 'utf8');
 
-    console.log(`[${taskId}] ✅ Files prepared with style: ${selectedStyle.name || 'Custom'}`);
+    console.log(`[${taskId}] ✅ Files prepared with HQ style: ${selectedStyle.name || 'Custom'}`);
 
     // Строим FFmpeg команды с выбранным стилем
     const buildStyleString = (style) => {
@@ -553,153 +642,19 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
     };
 
     const styleString = buildStyleString(selectedStyle);
+    const hqStyleString = buildHighQualityStyle(selectedStyle);
     console.log(`[${taskId}] Style string: ${styleString}`);
+    console.log(`[${taskId}] HQ Style string: ${hqStyleString}`);
 
-    // 🎨 СОВРЕМЕННЫЕ ШРИФТЫ: Команды для встраивания субтитров с красивыми шрифтами
+    // 🎯 ВЫСОКОКАЧЕСТВЕННЫЕ КОМАНДЫ FFMPEG - ЧЕТКИЙ ТЕКСТ БЕЗ ПИКСЕЛЕЙ
     const commands = [
-      // Команда 1: Полный стиль с выбранным шрифтом
-      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${styleString}'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
+      // Команда 1: МАКСИМАЛЬНОЕ КАЧЕСТВО - 4K рендеринг с downscale
+      `ffmpeg -i "${inputVideoPath}" -vf "scale=iw*2:ih*2,subtitles='${srtPath}':force_style='${hqStyleString}',scale=iw/2:ih/2:flags=lanczos" -c:a copy -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -movflags +faststart -y "${outputVideoPath}"`,
       
-      // Команда 2: Без указания шрифта, но с остальными стилями
-      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${selectedStyle.outline || 3}${selectedStyle.bold ? ',Bold=1' : ''}'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
+      // Команда 2: ВЫСОКОЕ КАЧЕСТВО - увеличенные размеры шрифтов + антиалиасинг
+      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${hqStyleString}'" -c:a copy -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -movflags +faststart -y "${outputVideoPath}"`,
       
-      // Команда 3: Fallback с DejaVu Sans
-      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='Fontname=DejaVu Sans,Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${selectedStyle.outline || 3}'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
+      // Команда 3: УЛУЧШЕННАЯ БАЗОВАЯ - с лучшими настройками кодирования
+      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='Fontname=DejaVu Sans-Bold,Fontsize=${selectedStyle.fontsize * 2},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${(selectedStyle.outline || 3) * 2},Bold=1'" -c:a copy -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -y "${outputVideoPath}"`,
       
-      // Команда 4: Базовый метод
-      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
-      
-      // Команда 5: Fallback с прямым путем к шрифту
-      `ffmpeg -i "${inputVideoPath}" -vf "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:text='✨ MODERN SUBTITLES ✨':fontsize=${selectedStyle.fontsize}:fontcolor=${selectedStyle.fontcolor || 'white'}:x=(w-text_w)/2:y=h-80:box=1:boxcolor=black@0.7:boxborderw=5" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`
-    ];
-
-    let success = false;
-    let usedCommand = 0;
-    let methodDescription = '';
-
-    for (let i = 0; i < commands.length && !success; i++) {
-      try {
-        console.log(`[${taskId}] 🎨 Trying style method ${i + 1}...`);
-        console.log(`[${taskId}] Command preview: ${commands[i].substring(0, 120)}...`);
-        
-        // Удаляем предыдущий файл
-        if (fs.existsSync(outputVideoPath)) {
-          fs.unlinkSync(outputVideoPath);
-        }
-        
-        const cmdStartTime = Date.now();
-        execSync(commands[i], { 
-          stdio: 'pipe',
-          timeout: 300000,
-          maxBuffer: 1024 * 1024 * 100
-        });
-        const cmdDuration = Date.now() - cmdStartTime;
-        
-        // Проверяем результат
-        if (fs.existsSync(outputVideoPath)) {
-          const outputSize = fs.statSync(outputVideoPath).size;
-          if (outputSize > 0) {
-            console.log(`[${taskId}] ✅ SUCCESS! Style method ${i + 1} worked! (${cmdDuration}ms)`);
-            console.log(`[${taskId}] Output size: ${outputSize} bytes`);
-            
-            success = true;
-            usedCommand = i + 1;
-            
-            const descriptions = [
-              'FULL_STYLE_WITH_FONT',
-              'FULL_STYLE_NO_FONT',
-              'SIMPLIFIED_STYLE',
-              'BASIC_SUBTITLES',
-              'FALLBACK_DRAWTEXT'
-            ];
-            methodDescription = descriptions[i];
-            
-            break;
-          }
-        }
-        
-      } catch (error) {
-        console.log(`[${taskId}] ❌ Style method ${i + 1} failed:`, error.message);
-      }
-    }
-
-    if (!success) {
-      throw new Error('All style methods failed');
-    }
-
-    // Читаем результат
-    const processedVideoBuffer = fs.readFileSync(outputVideoPath);
-    const processingTime = Date.now() - startTime;
-
-    console.log(`[${taskId}] 🎉 STYLED SUBTITLES SUCCESS! 🎨`);
-    console.log(`[${taskId}] Style: ${selectedStyle.name || 'Custom'}`);
-    console.log(`[${taskId}] Method: ${methodDescription}`);
-    console.log(`[${taskId}] Command: ${usedCommand}`);
-    console.log(`[${taskId}] Processing time: ${processingTime}ms`);
-
-    // Очистка временных файлов
-    [inputVideoPath, srtPath, outputVideoPath].forEach(filePath => {
-      try {
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-      } catch (err) {
-        console.warn(`[${taskId}] Failed to delete: ${filePath}`);
-      }
-    });
-
-    res.json({
-      success: true,
-      task_id: taskId,
-      processing_stats: {
-        processing_time_ms: processingTime,
-        input_size_bytes: videoBuffer.length,
-        output_size_bytes: processedVideoBuffer.length,
-        compression_ratio: (processedVideoBuffer.length / videoBuffer.length).toFixed(2),
-        method_used: methodDescription,
-        command_number: usedCommand
-      },
-      video_data: processedVideoBuffer.toString('base64'),
-      content_type: 'video/mp4',
-      style_info: {
-        style_id: customStyle ? 'custom' : styleId,
-        style_name: selectedStyle.name || 'Custom Style',
-        style_description: selectedStyle.description || 'Custom user style',
-        position: position,
-        position_name: SUBTITLE_POSITIONS[position]?.name || 'Снизу',
-        applied_settings: selectedStyle
-      }
-    });
-
-  } catch (error) {
-    console.error(`[${taskId}] 💥 STYLE ERROR:`, error.message);
-
-    // Очистка при ошибке
-    const tempFiles = [
-      `/tmp/processing/input_${taskId}.mp4`,
-      `/tmp/processing/subtitles_${taskId}.srt`,
-      `/tmp/processing/output_${taskId}.mp4`
-    ];
-    
-    tempFiles.forEach(filePath => {
-      try {
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-      } catch (err) {
-        // Игнорируем ошибки очистки
-      }
-    });
-
-    res.status(500).json({
-      success: false,
-      task_id: taskId,
-      error: error.message,
-      processing_time_ms: Date.now() - startTime
-    });
-  }
-});
-
-app.listen(PORT, () => {
-  console.log(`🎨 SOCIAL MEDIA Subtitle Service running on port ${PORT} 🎨`);
-  console.log(`📱 Ready for TikTok, Instagram, YouTube styles!`);
-  console.log(`🎬 Total available styles: ${Object.keys(SUBTITLE_STYLES).length}`);
-  const systemInfo = getSystemInfo();
-  console.log(`FFmpeg: ${systemInfo.ffmpeg_available}`);
-});
+      // Команда 4: СТАНДАРТНОЕ
