@@ -403,7 +403,7 @@ app.get('/health', (req, res) => {
     quality_mode: 'NO_COMPRESSION_MAXIMUM_QUALITY_STREAMING_ENABLED',
     endpoints: [
       '/process-video-with-subtitles (JSON response)',
-      '/process-video-stream (Binary stream - NO TIMEOUT)',
+      '/process-video-stream (JSON response - NO TIMEOUT)',
       '/process-video-lossless (Force lossless)',
       '/styles (Get all styles)',
       '/health (This endpoint)'
@@ -453,7 +453,7 @@ app.get('/styles', (req, res) => {
     total_styles: stylesWithPreview.length,
     default_style: 'tiktok_classic',
     default_position: 'bottom',
-    quality_mode: 'MAXIMUM_QUALITY_NO_COMPRESSION_WITH_STREAMING'
+    quality_mode: 'MAXIMUM_QUALITY_NO_COMPRESSION_WITH_JSON_RESPONSE'
   });
 });
 
@@ -473,7 +473,7 @@ function getSystemInfo() {
       ffmpeg_available: true,
       ffmpeg_version: ffmpegVersion,
       fonts_available: availableFonts,
-      subtitle_method: 'MAXIMUM_QUALITY_SOCIAL_MEDIA_STYLES_WITH_STREAMING'
+      subtitle_method: 'MAXIMUM_QUALITY_SOCIAL_MEDIA_STYLES_WITH_JSON_RESPONSE'
     };
   } catch (error) {
     return { 
@@ -571,15 +571,12 @@ function beautifySRT(srtContent, taskId) {
   return beautifiedSrt;
 }
 
-// 🚀 НОВЫЙ STREAMING ENDPOINT С CHUNKED ПЕРЕДАЧЕЙ (РЕШАЕТ NETWORK TIMEOUT)
-// Замените весь streaming endpoint на этот исправленный код:
-
-// 🚀 ИСПРАВЛЕННЫЙ STREAMING ENDPOINT (БЕЗ КОНФЛИКТОВ)
+// 🚀 STREAMING ENDPOINT С JSON ОТВЕТОМ (РЕШАЕТ NETWORK TIMEOUT)
 app.post('/process-video-stream', upload.single('video'), async (req, res) => {
   const taskId = req.body.task_id || uuidv4();
   const startTime = Date.now();
   
-  console.log(`\n=== [${taskId}] STREAMING QUALITY PROCESSING (NO TIMEOUT) ===`);
+  console.log(`\n=== [${taskId}] STREAMING QUALITY PROCESSING (JSON RESPONSE) ===`);
 
   try {
     // Валидация входных данных
@@ -740,61 +737,51 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     console.log(`[${taskId}] Processing time: ${processingTime}ms`);
     console.log(`[${taskId}] Size change: ${sizeChange > 0 ? '+' : ''}${sizeChange.toFixed(1)}%`);
     console.log(`[${taskId}] Quality mode: ${optimalSettings.description}`);
-
-    // 🎯 ПРОСТАЯ ОТПРАВКА (БЕЗ CHUNKED - ПРОБУЕМ СНАЧАЛА ЭТО)
-    res.setHeader('Content-Type', 'video/mp4');
-    res.setHeader('Content-Length', processedVideoBuffer.length);
-    res.setHeader('Content-Disposition', `attachment; filename="processed_${taskId}.mp4"`);
-    
-    // Метаданные в заголовках
-    res.setHeader('X-Processing-Stats', JSON.stringify({
-      processing_time_ms: processingTime,
-      input_size_bytes: videoBuffer.length,
-      output_size_bytes: processedVideoBuffer.length,
-      size_change_percent: parseFloat(sizeChange.toFixed(1)),
-      method_used: `STREAMING_METHOD_${usedCommand}`,
-      task_id: taskId,
-      quality_mode: forceQuality,
-      quality_description: optimalSettings.description
-    }));
-
-    res.setHeader('X-Style-Info', JSON.stringify({
-      style_id: customStyle ? 'custom' : styleId,
-      style_name_safe: customStyle ? 'Custom_Style' : styleId.replace(/_/g, '-'),
-      position: position,
-      fontsize: selectedStyle.fontsize,
-      fontcolor: selectedStyle.fontcolor,
-      has_background: !!selectedStyle.backcolour,
-      has_bold: !!selectedStyle.bold
-    }));
-
-    res.setHeader('X-Quality-Info', JSON.stringify({
-      input_resolution: videoQuality.resolution,
-      input_bitrate: videoQuality.bitrate,
-      input_quality_level: videoQuality.qualityLevel,
-      force_quality: forceQuality,
-      crf_used: optimalSettings.crf,
-      preset_used: optimalSettings.preset,
-      profile_used: optimalSettings.profile
-    }));
-
-    res.setHeader('Access-Control-Expose-Headers', 'X-Processing-Stats, X-Style-Info, X-Quality-Info, Content-Length');
-
-    console.log(`[${taskId}] 🚀 Sending processed video directly...`);
-    
-    // ОТПРАВЛЯЕМ ВИДЕО НАПРЯМУЮ (БЕЗ CHUNKS)
-    res.end(processedVideoBuffer);
+    console.log(`[${taskId}] 🚀 Sending as JSON Base64 (more reliable)...`);
 
     // Очистка временных файлов
-    setTimeout(() => {
-      [inputVideoPath, srtPath, outputVideoPath].forEach(filePath => {
-        try {
-          if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-        } catch (err) {
-          console.warn(`[${taskId}] Failed to delete: ${filePath}`);
-        }
-      });
-    }, 1000);
+    [inputVideoPath, srtPath, outputVideoPath].forEach(filePath => {
+      try {
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      } catch (err) {
+        console.warn(`[${taskId}] Failed to delete: ${filePath}`);
+      }
+    });
+
+    // JSON ответ с Base64 (НАДЕЖНО)
+    res.json({
+      success: true,
+      task_id: taskId,
+      processing_stats: {
+        processing_time_ms: processingTime,
+        input_size_bytes: videoBuffer.length,
+        output_size_bytes: processedVideoBuffer.length,
+        size_change_percent: parseFloat(sizeChange.toFixed(1)),
+        method_used: `STREAMING_METHOD_${usedCommand}`,
+        quality_mode: forceQuality,
+        quality_description: optimalSettings.description
+      },
+      video_data: processedVideoBuffer.toString('base64'),
+      content_type: 'video/mp4',
+      style_info: {
+        style_id: customStyle ? 'custom' : styleId,
+        style_name_safe: customStyle ? 'Custom_Style' : styleId.replace(/_/g, '-'),
+        position: position,
+        fontsize: selectedStyle.fontsize,
+        fontcolor: selectedStyle.fontcolor,
+        has_background: !!selectedStyle.backcolour,
+        has_bold: !!selectedStyle.bold
+      },
+      quality_info: {
+        input_resolution: videoQuality.resolution,
+        input_bitrate: videoQuality.bitrate,
+        input_quality_level: videoQuality.qualityLevel,
+        force_quality: forceQuality,
+        crf_used: optimalSettings.crf,
+        preset_used: optimalSettings.preset,
+        profile_used: optimalSettings.profile
+      }
+    });
 
   } catch (error) {
     console.error(`[${taskId}] 💥 STREAMING ERROR:`, error.message);
@@ -1131,14 +1118,14 @@ const server = app.listen(PORT, () => {
   console.log(`   • medium - Medium quality (CRF 18)`);
   console.log(`   • low - Low quality for testing (CRF 28)`);
   console.log(`🚀 Endpoints available:`);
-  console.log(`   • POST /process-video-stream (RECOMMENDED - No timeout)`);
-  console.log(`   • POST /process-video-with-subtitles (Legacy - May timeout)`);
+  console.log(`   • POST /process-video-stream (RECOMMENDED - JSON response)`);
+  console.log(`   • POST /process-video-with-subtitles (Legacy - JSON response)`);
   console.log(`   • POST /process-video-lossless (Shortcut for lossless)`);
   console.log(`   • GET /styles (Get all available styles)`);
   console.log(`   • GET /health (System status)`);
   const systemInfo = getSystemInfo();
   console.log(`FFmpeg: ${systemInfo.ffmpeg_available}`);
-  console.log(`Quality Mode: MAXIMUM_QUALITY_NO_COMPRESSION_WITH_STREAMING_SUPPORT`);
+  console.log(`Quality Mode: MAXIMUM_QUALITY_JSON_RESPONSE_WITH_RELIABLE_DELIVERY`);
 });
 
 // Увеличиваем timeout сервера
