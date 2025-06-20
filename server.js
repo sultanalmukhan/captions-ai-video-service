@@ -369,4 +369,311 @@ function beautifySRT(srtContent, taskId) {
       // Временные метки оставляем как есть
       improvedLines.push(line);
     } else if (/^\d+$/.test(line)) {
-      // Номера суб
+      // Номера субтитров оставляем как есть
+      improvedLines.push(line);
+    } else if (line.length > 0) {
+      // Улучшаем текст субтитров
+      let improvedText = line;
+      
+      // Убираем лишние пробелы
+      improvedText = improvedText.replace(/\s+/g, ' ').trim();
+      
+      // Исправляем пунктуацию
+      improvedText = improvedText.replace(/\s+([,.!?;:])/g, '$1');
+      improvedText = improvedText.replace(/([,.!?;:])\s*/g, '$1 ');
+      
+      // Добавляем красивые кавычки если нужно
+      improvedText = improvedText.replace(/"/g, '«').replace(/"/g, '»');
+      
+      // Если текст очень длинный, добавляем переносы в естественных местах
+      if (improvedText.length > 50) {
+        const words = improvedText.split(' ');
+        if (words.length > 8) {
+          const mid = Math.ceil(words.length / 2);
+          // Ищем хорошее место для переноса (после запятой, точки и т.д.)
+          let splitPoint = mid;
+          for (let j = mid - 2; j <= mid + 2 && j < words.length; j++) {
+            if (j > 0 && (words[j-1].endsWith(',') || words[j-1].endsWith('.') || words[j-1].endsWith('!'))) {
+              splitPoint = j;
+              break;
+            }
+          }
+          const firstLine = words.slice(0, splitPoint).join(' ');
+          const secondLine = words.slice(splitPoint).join(' ');
+          improvedText = firstLine + '\n' + secondLine;
+        }
+      }
+      
+      improvedLines.push(improvedText);
+    } else {
+      // Пустые строки
+      improvedLines.push('');
+    }
+  }
+  
+  beautifiedSrt = improvedLines.join('\n');
+  
+  // Убеждаемся, что SRT заканчивается правильно
+  if (!beautifiedSrt.endsWith('\n\n')) {
+    beautifiedSrt += '\n\n';
+  }
+  
+  console.log(`[${taskId}] ✅ SRT beautification complete`);
+  console.log(`[${taskId}] Beautified length: ${beautifiedSrt.length} chars`);
+  console.log(`[${taskId}] Preview:`, beautifiedSrt.substring(0, 300));
+  
+  return beautifiedSrt;
+}
+
+app.post('/process-video-with-subtitles', upload.single('video'), async (req, res) => {
+  const taskId = req.body.task_id || uuidv4();
+  const startTime = Date.now();
+  
+  console.log(`\n=== [${taskId}] SOCIAL MEDIA SUBTITLE PROCESSING (DYNAMIC FONTSIZE) ===`);
+
+  try {
+    // Валидация входных данных
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'Video file is required',
+        task_id: taskId
+      });
+    }
+
+    if (!req.body.srt_content) {
+      return res.status(400).json({
+        success: false,
+        error: 'SRT content is required',
+        task_id: taskId
+      });
+    }
+
+    const videoBuffer = req.file.buffer;
+    const rawSrtContent = req.body.srt_content;
+    
+    // 🎨 ПАРАМЕТРЫ ИЗ ЗАПРОСА
+    const styleId = req.body.style_id || 'tiktok_classic';
+    const position = req.body.position || 'bottom';
+    const customStyle = req.body.custom_style ? JSON.parse(req.body.custom_style) : null;
+    
+    // 📏 ДИНАМИЧЕСКИЙ РАЗМЕР ШРИФТА - ОСНОВНОЙ ПАРАМЕТР
+    let fontSize = 8; // по умолчанию
+    
+    if (req.body.fontsize) {
+      // Приоритет: прямой параметр fontsize
+      fontSize = parseInt(req.body.fontsize);
+      if (isNaN(fontSize) || fontSize < 4 || fontSize > 20) {
+        console.log(`[${taskId}] ⚠️ Invalid fontsize ${req.body.fontsize}, using default: 8`);
+        fontSize = 8; // fallback на безопасное значение
+      }
+    } else if (req.body.fontsize_preset && FONT_SIZES[req.body.fontsize_preset]) {
+      // Альтернатива: preset размера (tiny, small, medium, etc.)
+      fontSize = FONT_SIZES[req.body.fontsize_preset].value;
+      console.log(`[${taskId}] Using fontsize preset '${req.body.fontsize_preset}': ${fontSize}`);
+    }
+    
+    console.log(`[${taskId}] 📏 Final fontsize: ${fontSize}`);
+    
+    console.log(`[${taskId}] Video size: ${videoBuffer.length} bytes`);
+    console.log(`[${taskId}] Raw SRT length: ${rawSrtContent.length} chars`);
+    console.log(`[${taskId}] 🎨 Style: ${styleId}`);
+    console.log(`[${taskId}] 📍 Position: ${position}`);
+    console.log(`[${taskId}] 📏 Font size: ${fontSize} ${req.body.fontsize_preset ? `(preset: ${req.body.fontsize_preset})` : '(direct)'}`);
+    if (req.body.fontsize) {
+      console.log(`[${taskId}] 📏 Raw fontsize parameter: '${req.body.fontsize}'`);
+    }
+    
+    // Выбираем стиль
+    let selectedStyle;
+    if (customStyle) {
+      selectedStyle = { ...customStyle, fontsize: fontSize };
+      console.log(`[${taskId}] Using CUSTOM style with fontsize ${fontSize}:`, customStyle);
+    } else if (SUBTITLE_STYLES[styleId]) {
+      selectedStyle = { ...SUBTITLE_STYLES[styleId], fontsize: fontSize };
+      console.log(`[${taskId}] Using predefined style: ${selectedStyle.name} with fontsize ${fontSize}`);
+    } else {
+      selectedStyle = { ...SUBTITLE_STYLES.tiktok_classic, fontsize: fontSize };
+      console.log(`[${taskId}] Style not found, using default: ${selectedStyle.name} with fontsize ${fontSize}`);
+    }
+
+    // 📍 Применяем позицию субтитров
+    if (SUBTITLE_POSITIONS[position]) {
+      const positionSettings = SUBTITLE_POSITIONS[position];
+      selectedStyle.alignment = positionSettings.alignment;
+      selectedStyle.marginv = positionSettings.marginv;
+      console.log(`[${taskId}] 📍 Applied position: ${positionSettings.name} (alignment: ${positionSettings.alignment})`);
+    } else {
+      console.log(`[${taskId}] ⚠️ Invalid position '${position}', using default 'bottom'`);
+    }
+
+    // Создаем временные файлы
+    const tempDir = '/tmp/processing';
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+
+    const inputVideoPath = path.join(tempDir, `input_${taskId}.mp4`);
+    const srtPath = path.join(tempDir, `subtitles_${taskId}.srt`);
+    const outputVideoPath = path.join(tempDir, `output_${taskId}.mp4`);
+
+    // Сохраняем видео
+    fs.writeFileSync(inputVideoPath, videoBuffer);
+
+    // Beautify SRT
+    const beautifiedSRT = beautifySRT(rawSrtContent, taskId);
+    fs.writeFileSync(srtPath, beautifiedSRT, 'utf8');
+
+    console.log(`[${taskId}] ✅ Files prepared with style: ${selectedStyle.name || 'Custom'} and fontsize: ${fontSize}`);
+
+    // Строим FFmpeg команды с выбранным стилем и динамическим размером шрифта
+    const buildStyleString = (style) => {
+      let styleStr = `Fontsize=${style.fontsize}`;
+      
+      // Название шрифта
+      if (style.fontname) {
+        styleStr += `,Fontname=${style.fontname}`;
+      }
+      
+      // Цвет текста
+      if (style.fontcolor) {
+        const color = style.fontcolor.startsWith('&H') ? style.fontcolor : `&H${style.fontcolor}`;
+        styleStr += `,PrimaryColour=${color}`;
+      }
+      
+      // Обводка
+      if (style.outline) {
+        styleStr += `,OutlineColour=&H000000,Outline=${style.outline}`;
+      }
+      
+      // Тень
+      if (style.shadow) {
+        styleStr += `,Shadow=${style.shadow}`;
+      }
+      
+      // Жирность
+      if (style.bold) {
+        styleStr += `,Bold=${style.bold}`;
+      }
+      
+      // Выравнивание
+      if (style.alignment) {
+        styleStr += `,Alignment=${style.alignment}`;
+      }
+      
+      // Отступ
+      if (style.marginv) {
+        styleStr += `,MarginV=${style.marginv}`;
+      }
+      
+      // Фон
+      if (style.backcolour) {
+        styleStr += `,BackColour=${style.backcolour}`;
+      }
+      
+      return styleStr;
+    };
+
+    const styleString = buildStyleString(selectedStyle);
+    console.log(`[${taskId}] Style string: ${styleString}`);
+
+    // 🎨 КОМАНДЫ FFmpeg с динамическим размером шрифта
+    const commands = [
+      // Команда 1: Полный стиль с выбранным шрифтом
+      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${styleString}'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
+      
+      // Команда 2: Без указания шрифта, но с остальными стилями
+      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${selectedStyle.outline || 3}${selectedStyle.bold ? ',Bold=1' : ''}'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
+      
+      // Команда 3: Fallback с DejaVu Sans
+      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='Fontname=DejaVu Sans,Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${selectedStyle.outline || 3}'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
+      
+      // Команда 4: Базовый метод
+      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`,
+      
+      // Команда 5: Fallback с прямым путем к шрифту
+      `ffmpeg -i "${inputVideoPath}" -vf "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:text='✨ MODERN SUBTITLES ✨':fontsize=${selectedStyle.fontsize}:fontcolor=${selectedStyle.fontcolor || 'white'}:x=(w-text_w)/2:y=h-80:box=1:boxcolor=black@0.7:boxborderw=5" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`
+    ];
+
+    let success = false;
+    let usedCommand = 0;
+    let methodDescription = '';
+
+    for (let i = 0; i < commands.length && !success; i++) {
+      try {
+        console.log(`[${taskId}] 🎨 Trying style method ${i + 1}...`);
+        console.log(`[${taskId}] Command preview: ${commands[i].substring(0, 120)}...`);
+        
+        // Удаляем предыдущий файл
+        if (fs.existsSync(outputVideoPath)) {
+          fs.unlinkSync(outputVideoPath);
+        }
+        
+        const cmdStartTime = Date.now();
+        execSync(commands[i], { 
+          stdio: 'pipe',
+          timeout: 300000,
+          maxBuffer: 1024 * 1024 * 100
+        });
+        const cmdDuration = Date.now() - cmdStartTime;
+        
+        // Проверяем результат
+        if (fs.existsSync(outputVideoPath)) {
+          const outputSize = fs.statSync(outputVideoPath).size;
+          if (outputSize > 0) {
+            console.log(`[${taskId}] ✅ SUCCESS! Style method ${i + 1} worked! (${cmdDuration}ms)`);
+            console.log(`[${taskId}] Output size: ${outputSize} bytes`);
+            
+            success = true;
+            usedCommand = i + 1;
+            
+            const descriptions = [
+              'FULL_STYLE_WITH_FONT',
+              'FULL_STYLE_NO_FONT',
+              'SIMPLIFIED_STYLE',
+              'BASIC_SUBTITLES',
+              'FALLBACK_DRAWTEXT'
+            ];
+            methodDescription = descriptions[i];
+            
+            break;
+          }
+        }
+        
+      } catch (error) {
+        console.log(`[${taskId}] ❌ Style method ${i + 1} failed:`, error.message);
+      }
+    }
+
+    if (!success) {
+      throw new Error('All style methods failed');
+    }
+
+    // Читаем результат
+    const processedVideoBuffer = fs.readFileSync(outputVideoPath);
+    const processingTime = Date.now() - startTime;
+
+    console.log(`[${taskId}] 🎉 STYLED SUBTITLES SUCCESS! 🎨`);
+    console.log(`[${taskId}] Style: ${selectedStyle.name || 'Custom'}`);
+    console.log(`[${taskId}] Font size: ${fontSize}`);
+    console.log(`[${taskId}] Method: ${methodDescription}`);
+    console.log(`[${taskId}] Command: ${usedCommand}`);
+    console.log(`[${taskId}] Processing time: ${processingTime}ms`);
+
+    // Очистка временных файлов
+    [inputVideoPath, srtPath, outputVideoPath].forEach(filePath => {
+      try {
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      } catch (err) {
+        console.warn(`[${taskId}] Failed to delete: ${filePath}`);
+      }
+    });
+
+    res.json({
+      success: true,
+      task_id: taskId,
+      processing_stats: {
+        processing_time_ms: processingTime,
+        input_size_bytes: videoBuffer.length,
+        output_size_bytes: processedVideoBuffer.length,
+        compression_ratio: (processedVideoBuffer.length / videoBuffer.length).toFixed(
