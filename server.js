@@ -743,6 +743,7 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
     console.log(`[${taskId}] Method: ${methodDescription}`);
     console.log(`[${taskId}] Command: ${usedCommand}`);
     console.log(`[${taskId}] Processing time: ${processingTime}ms`);
+    console.log(`[${taskId}] 📦 Output file size: ${(processedVideoBuffer.length / (1024 * 1024)).toFixed(2)}MB`);
 
     // Очистка временных файлов
     [inputVideoPath, srtPath, outputVideoPath].forEach(filePath => {
@@ -752,6 +753,9 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
         console.warn(`[${taskId}] Failed to delete: ${filePath}`);
       }
     });
+
+    // 🚀 ВСЕГДА ВОЗВРАЩАЕМ ФАЙЛ В RESPONSE (БЕЗ ЛИМИТОВ НА РАЗМЕР)
+    console.log(`[${taskId}] ✅ Sending video as base64 in response`);
 
     res.json({
       success: true,
@@ -764,7 +768,8 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
         method_used: methodDescription,
         command_number: usedCommand,
         video_format: videoFormat,
-        high_quality_mode: enableHighQuality
+        high_quality_mode: enableHighQuality,
+        file_size_mb: (processedVideoBuffer.length / (1024 * 1024)).toFixed(2)
       },
       video_data: processedVideoBuffer.toString('base64'),
       content_type: 'video/mp4',
@@ -812,6 +817,7 @@ app.listen(PORT, () => {
   console.log(`📱 Ready for TikTok, Instagram, YouTube styles with CRYSTAL CLEAR text!`);
   console.log(`🎬 Total available HQ styles: ${Object.keys(SUBTITLE_STYLES).length}`);
   console.log(`🎯 Features: 4K downscale, mobile optimization, smart font fallbacks`);
+  console.log(`🚀 File handling: Always return video in response (no size limits)`);
   const systemInfo = getSystemInfo();
   console.log(`FFmpeg: ${systemInfo.ffmpeg_available}`);
   console.log(`Quality Mode: HIGH_QUALITY_RENDERING`);
