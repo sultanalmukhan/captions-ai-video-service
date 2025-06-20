@@ -35,194 +35,194 @@ const upload = multer({
   }
 });
 
-// 🎨 ГОТОВЫЕ СТИЛИ ДЛЯ СОЦИАЛЬНЫХ СЕТЕЙ (ВЫСОКОЕ КАЧЕСТВО + УМНЫЕ FALLBACK ШРИФТЫ)
+// 🎨 ГОТОВЫЕ СТИЛИ ДЛЯ СОЦИАЛЬНЫХ СЕТЕЙ (КОМПАКТНЫЕ РАЗМЕРЫ + УМНЫЕ FALLBACK ШРИФТЫ)
 const SUBTITLE_STYLES = {
-  // TikTok стили - ВЫСОКОЕ КАЧЕСТВО
+  // TikTok стили - оптимальные размеры
   tiktok_classic: {
-    fontsize: 16,  // Увеличено с 8 до 16
+    fontsize: 8,  // Возвращено к исходному размеру
     fontcolor: 'ffffff',
     fontname: 'DejaVu Sans-Bold',
     fontnames: ['Ubuntu-Bold', 'Liberation Sans-Bold', 'DejaVu Sans-Bold'],
-    outline: 4,   // Увеличено с 2 до 4
-    shadow: 2,    // Увеличено с 1 до 2
+    outline: 2,   // Возвращено к исходному
+    shadow: 1,    // Возвращено к исходному
     bold: 1,
     alignment: 2,
-    marginv: 30,  // Увеличено с 15 до 30
+    marginv: 15,  // Возвращено к исходному
     backcolour: '&H80000000',
-    name: 'TikTok Classic HQ',
-    description: 'Классический TikTok - белый жирный текст с черным фоном (высокое качество)'
+    name: 'TikTok Classic',
+    description: 'Классический TikTok - белый жирный текст с черным фоном'
   },
   
   tiktok_neon: {
-    fontsize: 18,  // Увеличено с 9 до 18
+    fontsize: 9,  // Возвращено к исходному
     fontcolor: '00ffff',
     fontname: 'Liberation Sans-Bold',
     fontnames: ['Roboto-Bold', 'Liberation Sans-Bold', 'Noto Sans-Bold'],
-    outline: 5,
-    shadow: 3,
+    outline: 2,
+    shadow: 1,
     bold: 1,
     alignment: 2,
-    marginv: 35,  // Увеличено
-    name: 'TikTok Neon HQ',
-    description: 'Неоновый TikTok стиль - яркий голубой с сильной обводкой (HQ)'
+    marginv: 13,  // Возвращено к исходному
+    name: 'TikTok Neon',
+    description: 'Неоновый TikTok стиль - яркий голубой с сильной обводкой'
   },
   
   tiktok_yellow: {
-    fontsize: 18,  // Увеличено
+    fontsize: 9,  // Возвращено к исходному
     fontcolor: 'ffff00',
     fontname: 'Ubuntu-Bold',
     fontnames: ['Ubuntu-Bold', 'Open Sans-Bold', 'DejaVu Sans-Bold'],
-    outline: 5,
-    shadow: 3,
+    outline: 2,
+    shadow: 1,
     bold: 1,
     alignment: 2,
-    marginv: 30,
-    name: 'TikTok Yellow HQ',
-    description: 'Желтый TikTok стиль - как у популярных блогеров (HQ)'
+    marginv: 15,
+    name: 'TikTok Yellow',
+    description: 'Желтый TikTok стиль - как у популярных блогеров'
   },
   
-  // Instagram стили - ВЫСОКОЕ КАЧЕСТВО
+  // Instagram стили - оптимальные размеры
   instagram_clean: {
-    fontsize: 15,  // Увеличено с 8 до 15
+    fontsize: 8,  // Возвращено к исходному
     fontcolor: 'ffffff',
     fontname: 'Noto Sans-Bold',
     fontnames: ['Noto Sans-Bold', 'Open Sans-Bold', 'Liberation Sans-Bold'],
-    outline: 3,
-    shadow: 2,
+    outline: 1,
+    shadow: 1,
     alignment: 2,
-    marginv: 40,  // Увеличено
-    backcolour: '&H60000000',
-    name: 'Instagram Clean HQ',
-    description: 'Чистый Instagram стиль - элегантный белый текст (HQ)'
+    marginv: 18,  // Возвращено к исходному
+    backcolour: '&H40000000',
+    name: 'Instagram Clean',
+    description: 'Чистый Instagram стиль - элегантный белый текст'
   },
   
   instagram_story: {
-    fontsize: 14,  // Увеличено с 7 до 14
+    fontsize: 7,  // Возвращено к исходному
     fontcolor: 'ffffff',
     fontname: 'Roboto-Bold',
     fontnames: ['Roboto-Bold', 'Noto Sans-Bold', 'DejaVu Sans-Bold'],
-    outline: 3,
-    shadow: 2,
+    outline: 1,
+    shadow: 1,
     alignment: 2,
-    marginv: 45,  // Увеличено
-    name: 'Instagram Story HQ',
-    description: 'Стиль Instagram Stories - тонкий и изящный (HQ)'
+    marginv: 20,  // Возвращено к исходному
+    name: 'Instagram Story',
+    description: 'Стиль Instagram Stories - тонкий и изящный'
   },
   
   instagram_reel: {
-    fontsize: 16,  // Увеличено с 8 до 16
+    fontsize: 8,  // Возвращено к исходному
     fontcolor: 'ffffff',
     fontname: 'Open Sans-Bold',
     fontnames: ['Open Sans-Bold', 'Liberation Sans-Bold', 'DejaVu Sans-Bold'],
-    outline: 4,
-    shadow: 3,
+    outline: 2,
+    shadow: 1,
     bold: 1,
     alignment: 2,
-    marginv: 30,
-    backcolour: '&H80000000',
-    name: 'Instagram Reel HQ',
-    description: 'Стиль Instagram Reels - жирный и контрастный (HQ)'
+    marginv: 15,
+    backcolour: '&H60000000',
+    name: 'Instagram Reel',
+    description: 'Стиль Instagram Reels - жирный и контрастный'
   },
   
-  // YouTube стили - ВЫСОКОЕ КАЧЕСТВО
+  // YouTube стили - оптимальные размеры
   youtube_classic: {
-    fontsize: 14,  // Увеличено с 7 до 14
+    fontsize: 7,  // Возвращено к исходному
     fontcolor: 'ffffff',
     fontname: 'Liberation Sans-Bold',
     fontnames: ['Source Sans Pro-Bold', 'Liberation Sans-Bold', 'Noto Sans-Bold'],
-    outline: 3,
-    shadow: 2,
+    outline: 1,
+    shadow: 1,
     alignment: 2,
-    marginv: 35,  // Увеличено
-    name: 'YouTube Classic HQ',
-    description: 'Классический YouTube - стандартные субтитры (HQ)'
+    marginv: 13,  // Возвращено к исходному
+    name: 'YouTube Classic',
+    description: 'Классический YouTube - стандартные субтитры'
   },
   
   youtube_gaming: {
-    fontsize: 16,  // Увеличено с 8 до 16
+    fontsize: 8,  // Возвращено к исходному
     fontcolor: '00ff00',
     fontname: 'DejaVu Sans-Bold',
     fontnames: ['Ubuntu-Bold', 'DejaVu Sans-Bold', 'Liberation Sans-Bold'],
-    outline: 4,
-    shadow: 3,
+    outline: 1,
+    shadow: 1,
     bold: 1,
     alignment: 2,
-    marginv: 32,
-    name: 'YouTube Gaming HQ',
-    description: 'Игровой стиль YouTube - зеленый геймерский (HQ)'
+    marginv: 14,
+    name: 'YouTube Gaming',
+    description: 'Игровой стиль YouTube - зеленый геймерский'
   },
   
-  // Современные трендовые стили - ВЫСОКОЕ КАЧЕСТВО
+  // Современные трендовые стили - оптимальные размеры
   modern_gradient: {
-    fontsize: 18,  // Увеличено
+    fontsize: 9,  // Возвращено к исходному
     fontcolor: 'ff69b4',
     fontname: 'Open Sans-Bold',
     fontnames: ['Montserrat-Bold', 'Open Sans-Bold', 'Liberation Sans-Bold'],
-    outline: 5,
-    shadow: 3,
+    outline: 2,
+    shadow: 1,
     bold: 1,
     alignment: 2,
-    marginv: 30,
-    name: 'Modern Pink HQ',
-    description: 'Модерн розовый - трендовый цвет 2024 (HQ)'
+    marginv: 15,
+    name: 'Modern Pink',
+    description: 'Модерн розовый - трендовый цвет 2024'
   },
   
   retro_vhs: {
-    fontsize: 16,  // Увеличено
+    fontsize: 8,  // Возвращено к исходному
     fontcolor: 'ff00ff',
     fontname: 'DejaVu Sans-Bold',
     fontnames: ['Ubuntu-Bold', 'DejaVu Sans-Bold', 'Liberation Sans-Bold'],
-    outline: 4,
-    shadow: 3,
+    outline: 1,
+    shadow: 1,
     bold: 1,
     alignment: 2,
-    marginv: 32,
-    name: 'Retro VHS HQ',
-    description: 'Ретро VHS стиль - фиолетовый винтаж (HQ)'
+    marginv: 14,
+    name: 'Retro VHS',
+    description: 'Ретро VHS стиль - фиолетовый винтаж'
   },
   
   minimal_black: {
-    fontsize: 14,  // Увеличено
+    fontsize: 7,  // Возвращено к исходному
     fontcolor: '000000',
     fontname: 'Noto Sans-Bold',
     fontnames: ['Roboto-Bold', 'Noto Sans-Bold', 'Liberation Sans-Bold'],
     outline: 0,
     shadow: 0,
     alignment: 2,
-    marginv: 25,
+    marginv: 10,
     backcolour: '&H80ffffff',
-    name: 'Minimal Black HQ',
-    description: 'Минималистичный - черный текст на белом фоне (HQ)'
+    name: 'Minimal Black',
+    description: 'Минималистичный - черный текст на белом фоне'
   },
   
-  // Премиум стили - ВЫСОКОЕ КАЧЕСТВО
+  // Премиум стили - оптимальные размеры
   luxury_gold: {
-    fontsize: 18,  // Увеличено
+    fontsize: 9,  // Возвращено к исходному
     fontcolor: 'ffd700',
     fontname: 'DejaVu Sans-Bold',
     fontnames: ['Ubuntu-Bold', 'DejaVu Sans-Bold', 'Liberation Sans-Bold'],
-    outline: 5,
-    shadow: 3,
+    outline: 2,
+    shadow: 1,
     bold: 1,
     alignment: 2,
-    marginv: 35,
+    marginv: 16,
     backcolour: '&H80000000',
-    name: 'Luxury Gold HQ',
-    description: 'Премиум золотой - роскошный стиль (HQ)'
+    name: 'Luxury Gold',
+    description: 'Премиум золотой - роскошный стиль'
   },
   
   neon_purple: {
-    fontsize: 18,  // Увеличено
+    fontsize: 9,  // Возвращено к исходному
     fontcolor: '9400d3',
     fontname: 'Liberation Sans-Bold',
     fontnames: ['Open Sans-Bold', 'Liberation Sans-Bold', 'Noto Sans-Bold'],
-    outline: 5,
-    shadow: 3,
+    outline: 2,
+    shadow: 1,
     bold: 1,
     alignment: 2,
-    marginv: 30,
-    name: 'Neon Purple HQ',
-    description: 'Неоновый фиолетовый - киберпанк стиль (HQ)'
+    marginv: 15,
+    name: 'Neon Purple',
+    description: 'Неоновый фиолетовый - киберпанк стиль'
   }
 };
 
@@ -230,13 +230,13 @@ const SUBTITLE_STYLES = {
 const SUBTITLE_POSITIONS = {
   bottom: {
     alignment: 2,     // По центру
-    marginv: 30,      // Увеличенный отступ снизу
+    marginv: 15,      // Возвращено к исходному размеру
     name: 'Снизу',
     description: 'Субтитры внизу экрана (стандарт)'
   },
   top: {
     alignment: 8,     // По центру вверху  
-    marginv: 30,      // Увеличенный отступ сверху
+    marginv: 15,      // Возвращено к исходному размеру
     name: 'Сверху',
     description: 'Субтитры вверху экрана'
   },
