@@ -657,4 +657,162 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
       // Команда 3: УЛУЧШЕННАЯ БАЗОВАЯ - с лучшими настройками кодирования
       `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='Fontname=DejaVu Sans-Bold,Fontsize=${selectedStyle.fontsize * 2},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${(selectedStyle.outline || 3) * 2},Bold=1'" -c:a copy -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -y "${outputVideoPath}"`,
       
-      // Команда 4: СТАНДАРТНОЕ
+      // Команда 4: СТАНДАРТНОЕ КАЧЕСТВО - обычный рендеринг
+      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${styleString}'" -c:a copy -c:v libx264 -preset medium -crf 22 -pix_fmt yuv420p -y "${outputVideoPath}"`,
+      
+      // Команда 5: FALLBACK - базовый метод
+      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}'" -c:a copy -c:v libx264 -preset fast -crf 23 -y "${outputVideoPath}"`
+    ];
+
+    // 🎯 МОБИЛЬНО-ОПТИМИЗИРОВАННЫЕ КОМАНДЫ ДЛЯ РАЗНЫХ ФОРМАТОВ
+    const mobileOptimizedCommands = {
+      vertical: `ffmpeg -i "${inputVideoPath}" -vf "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,subtitles='${srtPath}':force_style='Fontsize=${selectedStyle.fontsize * 2.5},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${(selectedStyle.outline || 3) * 2},Bold=1,Alignment=${selectedStyle.alignment},MarginV=${selectedStyle.marginv * 2}'" -c:a copy -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -movflags +faststart -y "${outputVideoPath}"`,
+      
+      horizontal: `ffmpeg -i "${inputVideoPath}" -vf "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,subtitles='${srtPath}':force_style='Fontsize=${selectedStyle.fontsize * 2.2},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${(selectedStyle.outline || 3) * 2},Bold=1,Alignment=${selectedStyle.alignment},MarginV=${selectedStyle.marginv * 1.8}'" -c:a copy -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -movflags +faststart -y "${outputVideoPath}"`,
+      
+      square: `ffmpeg -i "${inputVideoPath}" -vf "scale=1080:1080:force_original_aspect_ratio=decrease,pad=1080:1080:(ow-iw)/2:(oh-ih)/2,subtitles='${srtPath}':force_style='Fontsize=${selectedStyle.fontsize * 2.3},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${(selectedStyle.outline || 3) * 2},Bold=1,Alignment=${selectedStyle.alignment},MarginV=${selectedStyle.marginv * 1.9}'" -c:a copy -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -movflags +faststart -y "${outputVideoPath}"`
+    };
+
+    // Если включена мобильная оптимизация, добавляем специальную команду в начало
+    if (req.body.mobile_optimized === 'true' && mobileOptimizedCommands[videoFormat]) {
+      commands.unshift(mobileOptimizedCommands[videoFormat]);
+      console.log(`[${taskId}] 📱 Added mobile-optimized command for ${videoFormat} format`);
+    }
+
+    let success = false;
+    let usedCommand = 0;
+    let methodDescription = '';
+
+    for (let i = 0; i < commands.length && !success; i++) {
+      try {
+        console.log(`[${taskId}] 🎨 Trying HQ style method ${i + 1}...`);
+        console.log(`[${taskId}] Command preview: ${commands[i].substring(0, 150)}...`);
+        
+        // Удаляем предыдущий файл
+        if (fs.existsSync(outputVideoPath)) {
+          fs.unlinkSync(outputVideoPath);
+        }
+        
+        const cmdStartTime = Date.now();
+        execSync(commands[i], { 
+          stdio: 'pipe',
+          timeout: 300000,
+          maxBuffer: 1024 * 1024 * 100
+        });
+        const cmdDuration = Date.now() - cmdStartTime;
+        
+        // Проверяем результат
+        if (fs.existsSync(outputVideoPath)) {
+          const outputSize = fs.statSync(outputVideoPath).size;
+          if (outputSize > 0) {
+            console.log(`[${taskId}] ✅ SUCCESS! HQ method ${i + 1} worked! (${cmdDuration}ms)`);
+            console.log(`[${taskId}] Output size: ${outputSize} bytes`);
+            
+            success = true;
+            usedCommand = i + 1;
+            
+            const descriptions = [
+              req.body.mobile_optimized === 'true' ? `MOBILE_OPTIMIZED_${videoFormat.toUpperCase()}` : 'SUPER_HQ_4K_DOWNSCALE',
+              'HIGH_QUALITY_ENHANCED_FONTS',
+              'IMPROVED_BASIC_HQ',
+              'STANDARD_QUALITY',
+              'FALLBACK_BASIC'
+            ];
+            methodDescription = descriptions[req.body.mobile_optimized === 'true' ? 0 : i];
+            
+            break;
+          }
+        }
+        
+      } catch (error) {
+        console.log(`[${taskId}] ❌ HQ method ${i + 1} failed:`, error.message);
+      }
+    }
+
+    if (!success) {
+      throw new Error('All HQ style methods failed');
+    }
+
+    // Читаем результат
+    const processedVideoBuffer = fs.readFileSync(outputVideoPath);
+    const processingTime = Date.now() - startTime;
+
+    console.log(`[${taskId}] 🎉 HIGH QUALITY STYLED SUBTITLES SUCCESS! 🎨✨`);
+    console.log(`[${taskId}] Style: ${selectedStyle.name || 'Custom'}`);
+    console.log(`[${taskId}] Video Format: ${videoFormat}`);
+    console.log(`[${taskId}] Method: ${methodDescription}`);
+    console.log(`[${taskId}] Command: ${usedCommand}`);
+    console.log(`[${taskId}] Processing time: ${processingTime}ms`);
+
+    // Очистка временных файлов
+    [inputVideoPath, srtPath, outputVideoPath].forEach(filePath => {
+      try {
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      } catch (err) {
+        console.warn(`[${taskId}] Failed to delete: ${filePath}`);
+      }
+    });
+
+    res.json({
+      success: true,
+      task_id: taskId,
+      processing_stats: {
+        processing_time_ms: processingTime,
+        input_size_bytes: videoBuffer.length,
+        output_size_bytes: processedVideoBuffer.length,
+        compression_ratio: (processedVideoBuffer.length / videoBuffer.length).toFixed(2),
+        method_used: methodDescription,
+        command_number: usedCommand,
+        video_format: videoFormat,
+        high_quality_mode: enableHighQuality
+      },
+      video_data: processedVideoBuffer.toString('base64'),
+      content_type: 'video/mp4',
+      style_info: {
+        style_id: customStyle ? 'custom' : styleId,
+        style_name: selectedStyle.name || 'Custom Style',
+        style_description: selectedStyle.description || 'Custom user style',
+        position: position,
+        position_name: SUBTITLE_POSITIONS[position]?.name || 'Снизу',
+        applied_settings: selectedStyle,
+        quality_mode: 'HIGH_QUALITY_RENDERING'
+      }
+    });
+
+  } catch (error) {
+    console.error(`[${taskId}] 💥 HQ STYLE ERROR:`, error.message);
+
+    // Очистка при ошибке
+    const tempFiles = [
+      `/tmp/processing/input_${taskId}.mp4`,
+      `/tmp/processing/subtitles_${taskId}.srt`,
+      `/tmp/processing/output_${taskId}.mp4`,
+      `/tmp/processing/text_${taskId}.txt`
+    ];
+    
+    tempFiles.forEach(filePath => {
+      try {
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      } catch (err) {
+        // Игнорируем ошибки очистки
+      }
+    });
+
+    res.status(500).json({
+      success: false,
+      task_id: taskId,
+      error: error.message,
+      processing_time_ms: Date.now() - startTime
+    });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`🎨 HIGH QUALITY SOCIAL MEDIA Subtitle Service running on port ${PORT} 🎨`);
+  console.log(`📱 Ready for TikTok, Instagram, YouTube styles with CRYSTAL CLEAR text!`);
+  console.log(`🎬 Total available HQ styles: ${Object.keys(SUBTITLE_STYLES).length}`);
+  console.log(`🎯 Features: 4K downscale, mobile optimization, smart font fallbacks`);
+  const systemInfo = getSystemInfo();
+  console.log(`FFmpeg: ${systemInfo.ffmpeg_available}`);
+  console.log(`Quality Mode: HIGH_QUALITY_RENDERING`);
+});
