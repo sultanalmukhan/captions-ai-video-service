@@ -199,9 +199,19 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
   const startTime = Date.now();
   
   console.log(`\n=== [${taskId}] PROCESSING START ===`);
+  console.log(`[${taskId}] Request headers:`, req.headers['content-type']);
+  console.log(`[${taskId}] Request body keys:`, Object.keys(req.body));
+  
+  // Устанавливаем таймаут ответа
+  req.setTimeout(900000); // 15 минут
+  res.setTimeout(900000); // 15 минут
 
   try {
+    // Проверяем размер файла
+    console.log(`[${taskId}] Checking file upload...`);
+    
     if (!req.file) {
+      console.log(`[${taskId}] ❌ No file in request`);
       return res.status(400).json({
         success: false,
         error: 'Video file is required',
@@ -209,13 +219,19 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
       });
     }
 
+    console.log(`[${taskId}] ✅ File received: ${req.file.size} bytes`);
+    console.log(`[${taskId}] File mimetype: ${req.file.mimetype}`);
+
     if (!req.body.srt_content) {
+      console.log(`[${taskId}] ❌ No SRT content`);
       return res.status(400).json({
         success: false,
         error: 'SRT content is required',
         task_id: taskId
       });
     }
+
+    console.log(`[${taskId}] ✅ SRT content received: ${req.body.srt_content.length} chars`);
 
     const videoBuffer = req.file.buffer;
     const rawSrtContent = req.body.srt_content;
@@ -253,18 +269,29 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
     }
 
     // Создаем временные файлы
+    console.log(`[${taskId}] Creating temp files...`);
     const tempDir = '/tmp/processing';
     if (!fs.existsSync(tempDir)) {
       fs.mkdirSync(tempDir, { recursive: true });
+      console.log(`[${taskId}] Created temp directory: ${tempDir}`);
     }
 
     const inputVideoPath = path.join(tempDir, `input_${taskId}.mp4`);
     const srtPath = path.join(tempDir, `subtitles_${taskId}.srt`);
     const outputVideoPath = path.join(tempDir, `output_${taskId}.mp4`);
 
+    console.log(`[${taskId}] Saving video to: ${inputVideoPath}`);
     fs.writeFileSync(inputVideoPath, videoBuffer);
+    
+    const videoStats = fs.statSync(inputVideoPath);
+    console.log(`[${taskId}] ✅ Video saved: ${videoStats.size} bytes`);
+    
+    console.log(`[${taskId}] Beautifying SRT...`);
     const beautifiedSRT = beautifySRT(rawSrtContent, taskId);
     fs.writeFileSync(srtPath, beautifiedSRT, 'utf8');
+    
+    const srtStats = fs.statSync(srtPath);
+    console.log(`[${taskId}] ✅ SRT saved: ${srtStats.size} bytes`);
 
     // Строим стиль
     const buildStyleString = (style) => {
@@ -318,54 +345,93 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
 
     let success = false;
     let usedCommand = 0;
+    let lastError = null;
 
     for (let i = 0; i < commands.length && !success; i++) {
       try {
-        console.log(`[${taskId}] Trying method ${i + 1}...`);
+        console.log(`[${taskId}] 🎬 Trying FFmpeg method ${i + 1}/3...`);
+        console.log(`[${taskId}] Command: ${commands[i].substring(0, 100)}...`);
         
         if (fs.existsSync(outputVideoPath)) {
           fs.unlinkSync(outputVideoPath);
+          console.log(`[${taskId}] Removed previous output file`);
         }
         
-        execSync(commands[i], { 
+        const ffmpegStart = Date.now();
+        
+        // Отправляем промежуточный статус клиенту
+        if (i === 0) {
+          console.log(`[${taskId}] 📡 Starting FFmpeg processing...`);
+        }
+        
+        const result = execSync(commands[i], { 
           stdio: 'pipe',
-          timeout: 300000,
-          maxBuffer: 1024 * 1024 * 100
+          timeout: 300000, // 5 минут
+          maxBuffer: 1024 * 1024 * 100, // 100MB buffer
+          encoding: 'utf8'
         });
+        
+        const ffmpegTime = Date.now() - ffmpegStart;
+        console.log(`[${taskId}] FFmpeg completed in ${ffmpegTime}ms`);
         
         if (fs.existsSync(outputVideoPath)) {
           const outputSize = fs.statSync(outputVideoPath).size;
+          console.log(`[${taskId}] Output file created: ${outputSize} bytes`);
+          
           if (outputSize > 0) {
             console.log(`[${taskId}] ✅ SUCCESS with method ${i + 1}!`);
             success = true;
             usedCommand = i + 1;
             break;
+          } else {
+            console.log(`[${taskId}] ⚠️ Output file is empty`);
           }
+        } else {
+          console.log(`[${taskId}] ⚠️ No output file created`);
         }
         
       } catch (error) {
+        lastError = error;
         console.log(`[${taskId}] ❌ Method ${i + 1} failed:`, error.message);
+        console.log(`[${taskId}] Error details:`, error.toString().substring(0, 200));
       }
     }
 
     if (!success) {
-      throw new Error('All processing methods failed');
+      const errorMsg = `All processing methods failed. Last error: ${lastError?.message || 'Unknown'}`;
+      console.log(`[${taskId}] 💥 ${errorMsg}`);
+      throw new Error(errorMsg);
     }
 
+    console.log(`[${taskId}] 📖 Reading processed video...`);
     const processedVideoBuffer = fs.readFileSync(outputVideoPath);
     const processingTime = Date.now() - startTime;
 
     console.log(`[${taskId}] 🎉 SUCCESS! Processing time: ${processingTime}ms`);
+    console.log(`[${taskId}] Input: ${videoBuffer.length} bytes, Output: ${processedVideoBuffer.length} bytes`);
 
     // Очистка файлов
+    console.log(`[${taskId}] 🧹 Cleaning up temp files...`);
+    let cleanupErrors = 0;
     [inputVideoPath, srtPath, outputVideoPath].forEach(filePath => {
       try {
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+          console.log(`[${taskId}] ✅ Deleted: ${path.basename(filePath)}`);
+        }
       } catch (err) {
-        console.warn(`[${taskId}] Failed to delete: ${filePath}`);
+        cleanupErrors++;
+        console.warn(`[${taskId}] ⚠️ Failed to delete: ${filePath} - ${err.message}`);
       }
     });
+    
+    if (cleanupErrors === 0) {
+      console.log(`[${taskId}] ✅ All temp files cleaned up`);
+    }
 
+    console.log(`[${taskId}] 📤 Sending response...`);
+    
+    // Успешный ответ
     res.json({
       success: true,
       task_id: taskId,
@@ -392,8 +458,12 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
     });
 
   } catch (error) {
-    console.error(`[${taskId}] 💥 ERROR:`, error.message);
+    const processingTime = Date.now() - startTime;
+    console.error(`[${taskId}] 💥 FATAL ERROR after ${processingTime}ms:`, error.message);
+    console.error(`[${taskId}] Stack trace:`, error.stack?.substring(0, 500));
 
+    // Экстренная очистка файлов
+    console.log(`[${taskId}] 🚨 Emergency cleanup...`);
     const tempFiles = [
       `/tmp/processing/input_${taskId}.mp4`,
       `/tmp/processing/subtitles_${taskId}.srt`,
@@ -402,18 +472,37 @@ app.post('/process-video-with-subtitles', upload.single('video'), async (req, re
     
     tempFiles.forEach(filePath => {
       try {
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+          console.log(`[${taskId}] 🗑️ Emergency deleted: ${path.basename(filePath)}`);
+        }
       } catch (err) {
-        // Игнорируем ошибки очистки
+        console.warn(`[${taskId}] 🚨 Failed emergency delete: ${filePath}`);
       }
     });
 
-    res.status(500).json({
+    // Отправляем детальную ошибку
+    const errorResponse = {
       success: false,
       task_id: taskId,
       error: error.message,
-      processing_time_ms: Date.now() - startTime
-    });
+      error_type: error.name || 'UnknownError',
+      processing_time_ms: processingTime,
+      debug_info: {
+        node_version: process.version,
+        platform: process.platform,
+        memory_usage: process.memoryUsage(),
+        uptime: process.uptime()
+      }
+    };
+    
+    console.log(`[${taskId}] 📤 Sending error response:`, JSON.stringify(errorResponse, null, 2));
+    
+    if (!res.headersSent) {
+      res.status(500).json(errorResponse);
+    } else {
+      console.log(`[${taskId}] ⚠️ Headers already sent, cannot send error response`);
+    }
   }
 });
 
