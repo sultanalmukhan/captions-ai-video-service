@@ -11,6 +11,18 @@ const { v4: uuidv4 } = require('uuid');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Увеличиваем timeout для Railway
+app.use((req, res, next) => {
+  // Увеличиваем timeout до 15 минут
+  req.setTimeout(900000); // 15 минут
+  res.setTimeout(900000); // 15 минут
+  
+  // Отключаем буферизацию
+  res.setHeader('X-Accel-Buffering', 'no');
+  
+  next();
+});
+
 // Middleware
 app.use(express.json({ limit: '500mb' }));
 app.use(express.urlencoded({ extended: true, limit: '500mb' }));
@@ -559,7 +571,7 @@ function beautifySRT(srtContent, taskId) {
   return beautifiedSrt;
 }
 
-// 🚀 НОВЫЙ STREAMING ENDPOINT (РЕШАЕТ NETWORK TIMEOUT)
+// 🚀 НОВЫЙ STREAMING ENDPOINT С CHUNKED ПЕРЕДАЧЕЙ (РЕШАЕТ NETWORK TIMEOUT)
 app.post('/process-video-stream', upload.single('video'), async (req, res) => {
   const taskId = req.body.task_id || uuidv4();
   const startTime = Date.now();
@@ -717,7 +729,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
       throw new Error('All streaming methods failed');
     }
 
-    // 🚀 ОТПРАВЛЯЕМ ВИДЕО НАПРЯМУЮ (БЕЗ JSON)
+    // 🚀 ОТПРАВЛЯЕМ ВИДЕО CHUNKS (РЕШАЕТ NETWORK TIMEOUT)
     const processedVideoBuffer = fs.readFileSync(outputVideoPath);
     const processingTime = Date.now() - startTime;
     const sizeChange = ((processedVideoBuffer.length / videoBuffer.length) - 1) * 100;
@@ -731,7 +743,9 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     res.setHeader('Content-Type', 'video/mp4');
     res.setHeader('Content-Length', processedVideoBuffer.length);
     res.setHeader('Content-Disposition', `attachment; filename="processed_${taskId}.mp4"`);
-    
+    res.setHeader('Transfer-Encoding', 'chunked');
+    res.setHeader('Connection', 'keep-alive');
+
     // Метаданные в заголовках - ТОЛЬКО безопасные ASCII значения
     res.setHeader('X-Processing-Stats', JSON.stringify({
       processing_time_ms: processingTime,
@@ -743,7 +757,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
       quality_mode: forceQuality,
       quality_description: optimalSettings.description
     }));
-    
+
     // Упрощенная информация о стиле (без кириллицы и сложных объектов)
     res.setHeader('X-Style-Info', JSON.stringify({
       style_id: customStyle ? 'custom' : styleId,
@@ -768,21 +782,61 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     // Делаем заголовки доступными для клиента
     res.setHeader('Access-Control-Expose-Headers', 'X-Processing-Stats, X-Style-Info, X-Quality-Info, Content-Length');
 
-    console.log(`[${taskId}] 🚀 Streaming video directly to client...`);
-    
-    // 🎯 ОТПРАВЛЯЕМ ВИДЕО КАК BINARY STREAM
-    res.end(processedVideoBuffer);
+    console.log(`[${taskId}] 🚀 Streaming video in chunks to prevent timeout...`);
 
-    // Очистка временных файлов ПОСЛЕ отправки
-    setTimeout(() => {
-      [inputVideoPath, srtPath, outputVideoPath].forEach(filePath => {
-        try {
-          if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-        } catch (err) {
-          console.warn(`[${taskId}] Failed to delete: ${filePath}`);
-        }
-      });
-    }, 1000);
+    // 🎯 ОТПРАВЛЯЕМ ВИДЕО CHUNKS (64KB кусками)
+    const CHUNK_SIZE = 64 * 1024; // 64KB chunks
+    let bytesSent = 0;
+
+    const sendNextChunk = () => {
+      if (bytesSent >= processedVideoBuffer.length) {
+        console.log(`[${taskId}] ✅ All chunks sent successfully! (${bytesSent} bytes)`);
+        res.end();
+        
+        // Очистка временных файлов ПОСЛЕ отправки
+        setTimeout(() => {
+          [inputVideoPath, srtPath, outputVideoPath].forEach(filePath => {
+            try {
+              if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+            } catch (err) {
+              console.warn(`[${taskId}] Failed to delete: ${filePath}`);
+            }
+          });
+        }, 1000);
+        
+        return;
+      }
+      
+      const remainingBytes = processedVideoBuffer.length - bytesSent;
+      const chunkSize = Math.min(CHUNK_SIZE, remainingBytes);
+      const chunk = processedVideoBuffer.slice(bytesSent, bytesSent + chunkSize);
+      
+      const success = res.write(chunk);
+      bytesSent += chunkSize;
+      
+      const progress = (bytesSent / processedVideoBuffer.length * 100).toFixed(1);
+      console.log(`[${taskId}] 📦 Sent chunk: ${chunkSize} bytes (${progress}% complete)`);
+      
+      if (success) {
+        // Немедленно отправляем следующий chunk
+        setImmediate(sendNextChunk);
+      } else {
+        // Ждем когда буфер освободится
+        res.once('drain', sendNextChunk);
+      }
+    };
+
+    // Обработка ошибок соединения
+    res.on('error', (err) => {
+      console.error(`[${taskId}] 💥 Response stream error:`, err.message);
+    });
+
+    res.on('close', () => {
+      console.log(`[${taskId}] 🔌 Client disconnected`);
+    });
+
+    // Начинаем отправку chunks
+    sendNextChunk();
 
   } catch (error) {
     console.error(`[${taskId}] 💥 STREAMING ERROR:`, error.message);
@@ -1106,7 +1160,8 @@ app.post('/process-video-lossless', upload.single('video'), async (req, res) => 
   return app._router.handle(req, res);
 });
 
-app.listen(PORT, () => {
+// Настройки для сервера
+const server = app.listen(PORT, () => {
   console.log(`🎨 MAXIMUM QUALITY SOCIAL MEDIA Subtitle Service running on port ${PORT} 🎨`);
   console.log(`📱 Ready for TikTok, Instagram, YouTube styles with CRYSTAL CLEAR quality!`);
   console.log(`🎬 Total available styles: ${Object.keys(SUBTITLE_STYLES).length}`);
@@ -1127,3 +1182,8 @@ app.listen(PORT, () => {
   console.log(`FFmpeg: ${systemInfo.ffmpeg_available}`);
   console.log(`Quality Mode: MAXIMUM_QUALITY_NO_COMPRESSION_WITH_STREAMING_SUPPORT`);
 });
+
+// Увеличиваем timeout сервера
+server.timeout = 900000; // 15 минут
+server.keepAliveTimeout = 900000;
+server.headersTimeout = 900000;
