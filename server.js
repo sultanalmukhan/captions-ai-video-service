@@ -727,12 +727,12 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     console.log(`[${taskId}] Size change: ${sizeChange > 0 ? '+' : ''}${sizeChange.toFixed(1)}%`);
     console.log(`[${taskId}] Quality mode: ${optimalSettings.description}`);
 
-    // 🎯 УСТАНАВЛИВАЕМ ЗАГОЛОВКИ ДЛЯ STREAMING
+    // 🎯 БЕЗОПАСНЫЕ ЗАГОЛОВКИ (только ASCII символы)
     res.setHeader('Content-Type', 'video/mp4');
     res.setHeader('Content-Length', processedVideoBuffer.length);
     res.setHeader('Content-Disposition', `attachment; filename="processed_${taskId}.mp4"`);
     
-    // Метаданные в заголовках (вместо JSON)
+    // Метаданные в заголовках - ТОЛЬКО безопасные ASCII значения
     res.setHeader('X-Processing-Stats', JSON.stringify({
       processing_time_ms: processingTime,
       input_size_bytes: videoBuffer.length,
@@ -744,17 +744,25 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
       quality_description: optimalSettings.description
     }));
     
+    // Упрощенная информация о стиле (без кириллицы и сложных объектов)
     res.setHeader('X-Style-Info', JSON.stringify({
       style_id: customStyle ? 'custom' : styleId,
-      style_name: selectedStyle.name || 'Custom Style',
+      style_name_safe: customStyle ? 'Custom_Style' : styleId.replace(/_/g, '-'),
       position: position,
-      applied_settings: selectedStyle
+      fontsize: selectedStyle.fontsize,
+      fontcolor: selectedStyle.fontcolor,
+      has_background: !!selectedStyle.backcolour,
+      has_bold: !!selectedStyle.bold
     }));
 
     res.setHeader('X-Quality-Info', JSON.stringify({
-      input_quality: videoQuality,
-      encoding_settings: optimalSettings,
-      force_quality: forceQuality
+      input_resolution: videoQuality.resolution,
+      input_bitrate: videoQuality.bitrate,
+      input_quality_level: videoQuality.qualityLevel,
+      force_quality: forceQuality,
+      crf_used: optimalSettings.crf,
+      preset_used: optimalSettings.preset,
+      profile_used: optimalSettings.profile
     }));
 
     // Делаем заголовки доступными для клиента
