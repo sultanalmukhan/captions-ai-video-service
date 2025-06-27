@@ -571,12 +571,12 @@ function beautifySRT(srtContent, taskId) {
   return beautifiedSrt;
 }
 
-// 🚀 STREAMING ENDPOINT С JSON ОТВЕТОМ (РЕШАЕТ NETWORK TIMEOUT)
+// 🚀 STREAMING ENDPOINT С VALIDATED BASE64 RESPONSE
 app.post('/process-video-stream', upload.single('video'), async (req, res) => {
   const taskId = req.body.task_id || uuidv4();
   const startTime = Date.now();
   
-  console.log(`\n=== [${taskId}] STREAMING QUALITY PROCESSING (JSON RESPONSE) ===`);
+  console.log(`\n=== [${taskId}] STREAMING QUALITY PROCESSING (VALIDATED JSON) ===`);
 
   try {
     // Валидация входных данных
@@ -728,28 +728,70 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
       throw new Error('All streaming methods failed');
     }
 
-    // ТОЛЬКО ПОСЛЕ УСПЕШНОЙ ОБРАБОТКИ читаем результат
+    // ВАЛИДАЦИЯ И СОЗДАНИЕ ОТВЕТА
+    console.log(`[${taskId}] 🎉 STREAMING PROCESSING SUCCESS! 🚀`);
+    
+    // Проверяем что файл существует и имеет правильный размер
+    if (!fs.existsSync(outputVideoPath)) {
+      throw new Error('Output video file not found');
+    }
+
+    const outputStats = fs.statSync(outputVideoPath);
+    if (outputStats.size === 0) {
+      throw new Error('Output video file is empty');
+    }
+
+    console.log(`[${taskId}] 📹 Video file validated: ${outputStats.size} bytes`);
+
+    // Читаем файл как binary buffer
     const processedVideoBuffer = fs.readFileSync(outputVideoPath);
+    console.log(`[${taskId}] 📖 File read successfully: ${processedVideoBuffer.length} bytes`);
+
+    // Проверяем MP4 header
+    const mp4Header = processedVideoBuffer.slice(0, 12);
+    const isValidMP4 = mp4Header.includes(Buffer.from('ftyp')) || 
+                       mp4Header.slice(4, 8).toString() === 'ftyp';
+    
+    if (!isValidMP4) {
+      console.warn(`[${taskId}] ⚠️ Warning: File may not be valid MP4`);
+    } else {
+      console.log(`[${taskId}] ✅ Valid MP4 header detected`);
+    }
+
+    // Создаем Base64 с explicit encoding
+    const base64Data = processedVideoBuffer.toString('base64');
+    console.log(`[${taskId}] 🔢 Base64 created: ${base64Data.length} chars`);
+
+    // Валидируем Base64
+    const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+    if (!base64Regex.test(base64Data)) {
+      throw new Error('Invalid Base64 data generated');
+    }
+
+    console.log(`[${taskId}] ✅ Base64 validation passed`);
+
     const processingTime = Date.now() - startTime;
     const sizeChange = ((processedVideoBuffer.length / videoBuffer.length) - 1) * 100;
 
-    console.log(`[${taskId}] 🎉 STREAMING PROCESSING SUCCESS! 🚀`);
     console.log(`[${taskId}] Processing time: ${processingTime}ms`);
     console.log(`[${taskId}] Size change: ${sizeChange > 0 ? '+' : ''}${sizeChange.toFixed(1)}%`);
     console.log(`[${taskId}] Quality mode: ${optimalSettings.description}`);
-    console.log(`[${taskId}] 🚀 Sending as JSON Base64 (more reliable)...`);
+    console.log(`[${taskId}] 🚀 Sending validated JSON response...`);
 
     // Очистка временных файлов
     [inputVideoPath, srtPath, outputVideoPath].forEach(filePath => {
       try {
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+          console.log(`[${taskId}] 🗑️ Deleted: ${path.basename(filePath)}`);
+        }
       } catch (err) {
         console.warn(`[${taskId}] Failed to delete: ${filePath}`);
       }
     });
 
-    // JSON ответ с Base64 (НАДЕЖНО)
-    res.json({
+    // Создаем ответ с дополнительными метаданными для валидации
+    const responseData = {
       success: true,
       task_id: taskId,
       processing_stats: {
@@ -761,8 +803,18 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
         quality_mode: forceQuality,
         quality_description: optimalSettings.description
       },
-      video_data: processedVideoBuffer.toString('base64'),
+      video_data: base64Data,
       content_type: 'video/mp4',
+      // Добавляем метаданные для валидации на клиенте
+      video_metadata: {
+        original_size_bytes: processedVideoBuffer.length,
+        base64_length: base64Data.length,
+        expected_decoded_size: Math.ceil(base64Data.length * 3 / 4), // Base64 overhead
+        file_signature: processedVideoBuffer.slice(0, 12).toString('hex'), // MP4 magic bytes
+        is_valid_mp4: isValidMP4,
+        content_type: 'video/mp4',
+        encoding: 'base64'
+      },
       style_info: {
         style_id: customStyle ? 'custom' : styleId,
         style_name_safe: customStyle ? 'Custom_Style' : styleId.replace(/_/g, '-'),
@@ -781,7 +833,12 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
         preset_used: optimalSettings.preset,
         profile_used: optimalSettings.profile
       }
-    });
+    };
+
+    console.log(`[${taskId}] 📤 Sending JSON response with validated video data...`);
+
+    // Отправляем ответ
+    res.json(responseData);
 
   } catch (error) {
     console.error(`[${taskId}] 💥 STREAMING ERROR:`, error.message);
@@ -1118,14 +1175,14 @@ const server = app.listen(PORT, () => {
   console.log(`   • medium - Medium quality (CRF 18)`);
   console.log(`   • low - Low quality for testing (CRF 28)`);
   console.log(`🚀 Endpoints available:`);
-  console.log(`   • POST /process-video-stream (RECOMMENDED - JSON response)`);
+  console.log(`   • POST /process-video-stream (RECOMMENDED - Validated JSON)`);
   console.log(`   • POST /process-video-with-subtitles (Legacy - JSON response)`);
   console.log(`   • POST /process-video-lossless (Shortcut for lossless)`);
   console.log(`   • GET /styles (Get all available styles)`);
   console.log(`   • GET /health (System status)`);
   const systemInfo = getSystemInfo();
   console.log(`FFmpeg: ${systemInfo.ffmpeg_available}`);
-  console.log(`Quality Mode: MAXIMUM_QUALITY_JSON_RESPONSE_WITH_RELIABLE_DELIVERY`);
+  console.log(`Quality Mode: VALIDATED_JSON_RESPONSE_WITH_MP4_VERIFICATION`);
 });
 
 // Увеличиваем timeout сервера
