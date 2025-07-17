@@ -224,14 +224,14 @@ function buildCustomStyle(styleParams) {
     let cleanColor = params.background.replace('#', '').toLowerCase();
     
     if (/^[0-9a-f]{6}$/i.test(cleanColor)) {
-      // 6-значный HEX -> формат как в рабочих стилях (&H80RRGGBB)
-      backcolour = `&H80${cleanColor.toUpperCase()}`;
-      console.log(`[DEBUG] ✅ Created backcolour: ${backcolour} (semi-transparent)`);
+      // 🎯 НОВОЕ: 100% непрозрачный фон вместо полупрозрачного
+      backcolour = `&H00${cleanColor.toUpperCase()}`;  // 00 = полностью непрозрачный
+      console.log(`[DEBUG] ✅ Created SOLID backcolour: ${backcolour} (fully opaque)`);
     } else if (/^[0-9a-f]{3}$/i.test(cleanColor)) {
       // 3-значный HEX
       const expandedHex = cleanColor.split('').map(char => char + char).join('');
-      backcolour = `&H80${expandedHex.toUpperCase()}`;
-      console.log(`[DEBUG] ✅ Created backcolour from short hex: ${backcolour}`);
+      backcolour = `&H00${expandedHex.toUpperCase()}`;  // 00 = полностью непрозрачный
+      console.log(`[DEBUG] ✅ Created SOLID backcolour from short hex: ${backcolour}`);
     } else if (/^[0-9a-f]{8}$/i.test(cleanColor)) {
       // 8-значный HEX с альфой
       const alpha = cleanColor.substring(6, 8);
