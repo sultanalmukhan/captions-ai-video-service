@@ -571,7 +571,6 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     }
 
     const inputVideoPath = path.join(tempDir, `stream_input_${taskId}.mp4`);
-    const srtPath = path.join(tempDir, `stream_subtitles_${taskId}.srt`);
     const outputVideoPath = path.join(tempDir, `stream_output_${taskId}.mp4`);
 
     // Сохраняем файлы
@@ -608,8 +607,8 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
       subtitleContent = beautifySRT(rawSrtContent, taskId);
     }
     
-    const srtPath = path.join(tempDir, `stream_subtitles_${taskId}${subtitleExt}`);
-    fs.writeFileSync(srtPath, subtitleContent, 'utf8');
+    const subtitlePath = path.join(tempDir, `stream_subtitles_${taskId}${subtitleExt}`);
+    fs.writeFileSync(subtitlePath, subtitleContent, 'utf8');
 
     // 🎨 СТРОИМ STYLE STRING ДЛЯ FFMPEG
     const buildStyleString = (style) => {
@@ -796,7 +795,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     console.log(`[${taskId}] 🚀 Sending validated JSON response...`);
 
     // Очистка временных файлов
-    [inputVideoPath, srtPath, outputVideoPath].forEach(filePath => {
+    [inputVideoPath, subtitlePath, outputVideoPath].forEach(filePath => {
       try {
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath);
@@ -863,6 +862,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     const tempFiles = [
       `/tmp/processing/stream_input_${taskId}.mp4`,
       `/tmp/processing/stream_subtitles_${taskId}.srt`,
+      `/tmp/processing/stream_subtitles_${taskId}.ass`,
       `/tmp/processing/stream_output_${taskId}.mp4`
     ];
     
