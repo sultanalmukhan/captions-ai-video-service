@@ -78,8 +78,11 @@ const AVAILABLE_FONTS = [
 
 // 🎨 УПРОЩЕННАЯ ФУНКЦИЯ ДЛЯ ОБРАБОТКИ ПАРАМЕТРА BACKGROUND
 function processBackgroundParam(backgroundValue) {
+  console.log(`[DEBUG] processBackgroundParam called with: "${backgroundValue}" (type: ${typeof backgroundValue})`);
+  
   // Если пустая строка, null, undefined, false - отключаем фон
   if (!backgroundValue || backgroundValue === "") {
+    console.log(`[DEBUG] Background disabled (empty or false)`);
     return {
       enabled: false,
       color: null,
@@ -89,10 +92,13 @@ function processBackgroundParam(backgroundValue) {
   
   // Если строка с цветом - обрабатываем как HEX цвет
   if (typeof backgroundValue === 'string' && backgroundValue.trim().length > 0) {
+    console.log(`[DEBUG] Processing background as HEX color: "${backgroundValue.trim()}"`);
     const processedColor = processBackgroundColor(backgroundValue.trim());
+    console.log(`[DEBUG] Background color processed result:`, processedColor);
     return processedColor;
   }
   
+  console.log(`[DEBUG] Invalid background value, disabling`);
   return {
     enabled: false,
     color: null,
@@ -102,13 +108,17 @@ function processBackgroundParam(backgroundValue) {
 
 // 🎨 УПРОЩЕННАЯ ФУНКЦИЯ ДЛЯ ОБРАБОТКИ ЦВЕТОВ ФОНА
 function processBackgroundColor(colorString) {
+  console.log(`[DEBUG] processBackgroundColor called with: "${colorString}"`);
+  
   // Убираем # если есть
   let cleanColor = colorString.replace('#', '').toLowerCase();
+  console.log(`[DEBUG] Cleaned color: "${cleanColor}"`);
   
   // Обрабатываем только HEX цвета
   if (/^[0-9a-f]{6}$/i.test(cleanColor)) {
     // 6-значный HEX: ff0000
     const ffmpegColor = `&HFF${cleanColor.toUpperCase()}`;
+    console.log(`[DEBUG] 6-digit HEX "${cleanColor}" -> ${ffmpegColor} (fully opaque)`);
     return {
       enabled: true,
       color: ffmpegColor,
@@ -120,6 +130,7 @@ function processBackgroundColor(colorString) {
     // 3-значный HEX: f00 -> ff0000
     const expandedHex = cleanColor.split('').map(char => char + char).join('');
     const ffmpegColor = `&HFF${expandedHex.toUpperCase()}`;
+    console.log(`[DEBUG] 3-digit HEX "${cleanColor}" expanded to "${expandedHex}" -> ${ffmpegColor} (solid)`);
     return {
       enabled: true,
       color: ffmpegColor,
@@ -133,6 +144,7 @@ function processBackgroundColor(colorString) {
     const alpha = cleanColor.substring(6, 8);
     const color = cleanColor.substring(0, 6);
     const ffmpegColor = `&H${alpha.toUpperCase()}${color.toUpperCase()}`;
+    console.log(`[DEBUG] 8-digit HEX with alpha "${cleanColor}" -> ${ffmpegColor}`);
     return {
       enabled: true,
       color: ffmpegColor,
@@ -140,6 +152,7 @@ function processBackgroundColor(colorString) {
     };
   }
   
+  console.log(`[DEBUG] Invalid HEX color format "${colorString}", disabling background`);
   return {
     enabled: false,
     color: null,
@@ -164,6 +177,8 @@ function parseBooleanParam(value) {
 
 // 🎨 ФУНКЦИЯ СОЗДАНИЯ СТИЛЯ ИЗ ПАРАМЕТРОВ (ОБНОВЛЕННАЯ)
 function buildCustomStyle(styleParams) {
+  console.log(`[DEBUG] buildCustomStyle called with:`, styleParams);
+  
   // Значения по умолчанию
   const defaults = {
     fontsize: 8,
@@ -177,20 +192,29 @@ function buildCustomStyle(styleParams) {
   // Объединяем с пользовательскими параметрами
   const params = { ...defaults, ...styleParams };
   
+  console.log(`[DEBUG] After applying defaults:`, params);
+  
   // Валидация параметров
   params.fontsize = Math.max(6, Math.min(12, parseInt(params.fontsize) || 8));
   params.fontcolor = (params.fontcolor || 'ffffff').replace('#', '').toLowerCase();
   
   // Обработка boolean параметров
+  console.log(`[DEBUG] Before boolean parsing: bold="${params.bold}", outline="${params.outline}"`);
   params.bold = parseBooleanParam(params.bold);
   params.outline = parseBooleanParam(params.outline);
+  console.log(`[DEBUG] After boolean parsing: bold=${params.bold}, outline=${params.outline}`);
   
   // Обработка цвета фона
+  console.log(`[DEBUG] Processing background parameter: "${params.background}" (type: ${typeof params.background})`);
   let backgroundData = processBackgroundParam(params.background);
+  console.log(`[DEBUG] Background processing result:`, backgroundData);
   
   if (!['bottom', 'top', 'center'].includes(params.position)) {
+    console.log(`[DEBUG] Invalid position "${params.position}", using default "bottom"`);
     params.position = 'bottom';
   }
+  
+  console.log(`[DEBUG] Final params after validation:`, { ...params, background: backgroundData });
   
   // Применяем позицию
   const positionSettings = SUBTITLE_POSITIONS[params.position];
@@ -206,19 +230,28 @@ function buildCustomStyle(styleParams) {
     marginv: positionSettings.marginv
   };
   
+  console.log(`[DEBUG] Base style created:`, style);
+  
   // Добавляем обводку если включена
   if (params.outline) {
     style.outline = 2;
     style.shadow = 1;
+    console.log(`[DEBUG] ✅ OUTLINE ENABLED: Added outline=2, shadow=1`);
   } else {
     style.outline = 0;
     style.shadow = 0;
+    console.log(`[DEBUG] ❌ OUTLINE DISABLED: outline=0, shadow=0`);
   }
   
   // Добавляем фон если включен
   if (backgroundData.enabled) {
     style.backcolour = backgroundData.color;
+    console.log(`[DEBUG] ✅ BACKGROUND ENABLED: Added backcolour=${backgroundData.color} (${backgroundData.description})`);
+  } else {
+    console.log(`[DEBUG] ❌ BACKGROUND DISABLED: no backcolour (${backgroundData.description})`);
   }
+  
+  console.log(`[DEBUG] Final style object:`, style);
   
   return {
     style,
@@ -542,8 +575,14 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     const forceQuality = req.body.force_quality || 'auto';
     
     console.log(`[${taskId}] Video size: ${(videoBuffer.length / 1024 / 1024).toFixed(2)}MB`);
-    console.log(`[${taskId}] Style params:`, styleParams);
-    console.log(`[${taskId}] Quality mode: ${forceQuality}`);
+    console.log(`[${taskId}] 🎨 RAW INCOMING STYLE PARAMS:`);
+    console.log(`[${taskId}]   fontsize: "${styleParams.fontsize}" (type: ${typeof styleParams.fontsize})`);
+    console.log(`[${taskId}]   fontcolor: "${styleParams.fontcolor}" (type: ${typeof styleParams.fontcolor})`);
+    console.log(`[${taskId}]   bold: "${styleParams.bold}" (type: ${typeof styleParams.bold})`);
+    console.log(`[${taskId}]   outline: "${styleParams.outline}" (type: ${typeof styleParams.outline})`);
+    console.log(`[${taskId}]   position: "${styleParams.position}" (type: ${typeof styleParams.position})`);
+    console.log(`[${taskId}]   background: "${styleParams.background}" (type: ${typeof styleParams.background})`);
+    console.log(`[${taskId}] 🎯 Quality mode: ${forceQuality}`);
     
     // 🎨 СОЗДАЕМ КАСТОМНЫЙ СТИЛЬ
     const { style: selectedStyle, description: styleDescription } = buildCustomStyle(styleParams);
@@ -582,40 +621,53 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     // 🎨 СТРОИМ STYLE STRING ДЛЯ FFMPEG
     const buildStyleString = (style) => {
       let styleStr = `Fontsize=${style.fontsize}`;
+      console.log(`[${taskId}] 🎨 Building FFmpeg style string...`);
+      console.log(`[${taskId}] 🎨 Input style object:`, style);
       
       if (style.fontname) {
         styleStr += `,Fontname=${style.fontname}`;
+        console.log(`[${taskId}] 🎨 Added fontname: ${style.fontname}`);
       }
       
       if (style.fontcolor) {
         const color = style.fontcolor.startsWith('&H') ? style.fontcolor : `&H${style.fontcolor}`;
         styleStr += `,PrimaryColour=${color}`;
+        console.log(`[${taskId}] 🎨 Added fontcolor: ${color}`);
       }
       
       if (style.outline && style.outline > 0) {
         styleStr += `,OutlineColour=&H000000,Outline=${style.outline}`;
+        console.log(`[${taskId}] 🎨 Added outline: ${style.outline}`);
       }
       
       if (style.shadow && style.shadow > 0) {
         styleStr += `,Shadow=${style.shadow}`;
+        console.log(`[${taskId}] 🎨 Added shadow: ${style.shadow}`);
       }
       
       if (style.bold) {
         styleStr += `,Bold=${style.bold}`;
+        console.log(`[${taskId}] 🎨 Added bold: ${style.bold}`);
       }
       
       if (style.alignment) {
         styleStr += `,Alignment=${style.alignment}`;
+        console.log(`[${taskId}] 🎨 Added alignment: ${style.alignment}`);
       }
       
       if (style.marginv !== undefined) {
         styleStr += `,MarginV=${style.marginv}`;
+        console.log(`[${taskId}] 🎨 Added marginv: ${style.marginv}`);
       }
       
       if (style.backcolour) {
         styleStr += `,BackColour=${style.backcolour}`;
+        console.log(`[${taskId}] 🎨 ✅ Added backcolour: ${style.backcolour}`);
+      } else {
+        console.log(`[${taskId}] 🎨 ❌ No backcolour in style object`);
       }
       
+      console.log(`[${taskId}] 🎨 Final FFmpeg style string: ${styleStr}`);
       return styleStr;
     };
 
