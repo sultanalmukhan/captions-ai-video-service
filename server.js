@@ -573,7 +573,11 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
       }
       
       // 🔍 СПЕЦИАЛЬНАЯ ОТЛАДКА ДЛЯ BACKGROUND
-      if (style.backcolour) {
+      console.log(`[${taskId}] 🔍 Background check: style.backcolour = "${style.backcolour}"`);
+      console.log(`[${taskId}] 🔍 Background check: Boolean(style.backcolour) = ${Boolean(style.backcolour)}`);
+      console.log(`[${taskId}] 🔍 Background check: typeof style.backcolour = ${typeof style.backcolour}`);
+      
+      if (style.backcolour !== undefined && style.backcolour !== null && style.backcolour !== '') {
         styleStr += `,BackColour=${style.backcolour}`;
         console.log(`[${taskId}] ✅ BACKGROUND ADDED TO FFMPEG: BackColour=${style.backcolour}`);
       } else {
