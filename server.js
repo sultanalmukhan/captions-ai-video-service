@@ -76,128 +76,18 @@ const AVAILABLE_FONTS = [
   'Open Sans'
 ];
 
-// 🎨 УПРОЩЕННАЯ ФУНКЦИЯ ДЛЯ ОБРАБОТКИ ПАРАМЕТРА BACKGROUND
-function processBackgroundParam(backgroundValue) {
-  console.log(`[DEBUG] processBackgroundParam called with: "${backgroundValue}" (type: ${typeof backgroundValue})`);
-  
-  // Если пустая строка, null, undefined, false - отключаем фон
-  if (!backgroundValue || backgroundValue === "") {
-    console.log(`[DEBUG] Background disabled (empty or false)`);
-    return {
-      enabled: false,
-      color: null,
-      description: 'disabled'
-    };
-  }
-  
-  // Если строка с цветом - обрабатываем как HEX цвет
-  if (typeof backgroundValue === 'string' && backgroundValue.trim().length > 0) {
-    console.log(`[DEBUG] Processing background as HEX color: "${backgroundValue.trim()}"`);
-    const processedColor = processBackgroundColor(backgroundValue.trim());
-    console.log(`[DEBUG] Background color processed result:`, processedColor);
-    return processedColor;
-  }
-  
-  console.log(`[DEBUG] Invalid background value, disabling`);
-  return {
-    enabled: false,
-    color: null,
-    description: 'disabled (invalid value)'
-  };
-}
-
-// 🎨 УПРОЩЕННАЯ ФУНКЦИЯ ДЛЯ ОБРАБОТКИ ЦВЕТОВ ФОНА
-function processBackgroundColor(colorString) {
-  console.log(`[DEBUG] processBackgroundColor called with: "${colorString}"`);
-  
-  // Убираем # если есть
-  let cleanColor = colorString.replace('#', '').toLowerCase();
-  console.log(`[DEBUG] Cleaned color: "${cleanColor}"`);
-  
-  // Обрабатываем только HEX цвета
-  if (/^[0-9a-f]{6}$/i.test(cleanColor)) {
-    // 6-значный HEX: ff0000 -> BGR формат для ASS
-    const r = cleanColor.substring(0, 2);
-    const g = cleanColor.substring(2, 4);
-    const b = cleanColor.substring(4, 6);
-    // ASS использует BGR формат, не RGB!
-    const assColor = `&H${b}${g}${r}`.toUpperCase();
-    console.log(`[DEBUG] 6-digit HEX "${cleanColor}" -> RGB(${r},${g},${b}) -> ASS BGR: ${assColor}`);
-    return {
-      enabled: true,
-      color: assColor,
-      description: `#${cleanColor} (solid BGR)`
-    };
-  }
-  
-  if (/^[0-9a-f]{3}$/i.test(cleanColor)) {
-    // 3-значный HEX: f00 -> ff0000
-    const expandedHex = cleanColor.split('').map(char => char + char).join('');
-    const r = expandedHex.substring(0, 2);
-    const g = expandedHex.substring(2, 4);
-    const b = expandedHex.substring(4, 6);
-    // ASS использует BGR формат
-    const assColor = `&H${b}${g}${r}`.toUpperCase();
-    console.log(`[DEBUG] 3-digit HEX "${cleanColor}" expanded to "${expandedHex}" -> ASS BGR: ${assColor}`);
-    return {
-      enabled: true,
-      color: assColor,
-      description: `#${expandedHex} (solid BGR)`
-    };
-  }
-  
-  // Обрабатываем HEX с альфа-каналом
-  if (/^[0-9a-f]{8}$/i.test(cleanColor)) {
-    // 8-значный HEX с альфой: ff000080
-    const r = cleanColor.substring(0, 2);
-    const g = cleanColor.substring(2, 4);
-    const b = cleanColor.substring(4, 6);
-    const alpha = cleanColor.substring(6, 8);
-    // ASS: ALPHA + BGR формат
-    const assColor = `&H${alpha}${b}${g}${r}`.toUpperCase();
-    console.log(`[DEBUG] 8-digit HEX with alpha "${cleanColor}" -> RGBA(${r},${g},${b},${alpha}) -> ASS ABGR: ${assColor}`);
-    return {
-      enabled: true,
-      color: assColor,
-      description: `#${r}${g}${b} (${Math.round(parseInt(alpha, 16) / 255 * 100)}% opacity BGR)`
-    };
-  }
-  
-  console.log(`[DEBUG] Invalid HEX color format "${colorString}", disabling background`);
-  return {
-    enabled: false,
-    color: null,
-    description: 'disabled (invalid HEX format)'
-  };
-}
-
-// 🔧 HELPER ФУНКЦИЯ ДЛЯ ПАРСИНГА BOOLEAN ПАРАМЕТРОВ
-function parseBooleanParam(value) {
-  if (typeof value === 'boolean') {
-    return value;
-  }
-  if (typeof value === 'string') {
-    const lowercased = value.toLowerCase().trim();
-    return lowercased === 'true' || lowercased === '1' || lowercased === 'yes';
-  }
-  if (typeof value === 'number') {
-    return value !== 0;
-  }
-  return false;
-}
-
-// 🎨 ФУНКЦИЯ СОЗДАНИЯ СТИЛЯ ИЗ ПАРАМЕТРОВ (ИСПРАВЛЕННАЯ ПО ОБРАЗЦУ РАБОЧЕГО КОДА)
+// 🎨 ФУНКЦИЯ СОЗДАНИЯ СТИЛЯ ИЗ ПАРАМЕТРОВ
 function buildCustomStyle(styleParams) {
   console.log(`[DEBUG] buildCustomStyle called with:`, styleParams);
   
-  // Значения по умолчанию (как в рабочих готовых стилях)
+  // Значения по умолчанию
   const defaults = {
     fontsize: 8,
     fontcolor: 'ffffff',
     bold: false,
     outline: true,
     position: 'bottom',
-    background: ""  // пустая строка = без фона
+    background: false
   };
   
   // Объединяем с пользовательскими параметрами
@@ -209,60 +99,42 @@ function buildCustomStyle(styleParams) {
   params.fontsize = Math.max(6, Math.min(12, parseInt(params.fontsize) || 8));
   params.fontcolor = (params.fontcolor || 'ffffff').replace('#', '').toLowerCase();
   
-  // Обработка boolean параметров
-  console.log(`[DEBUG] Before boolean parsing: bold="${params.bold}", outline="${params.outline}"`);
+  // ✅ ИСПРАВЛЕНИЕ: Правильная обработка boolean параметров из строк
+  console.log(`[DEBUG] Before boolean parsing: bold="${params.bold}", outline="${params.outline}", background="${params.background}"`);
+  
   params.bold = parseBooleanParam(params.bold);
   params.outline = parseBooleanParam(params.outline);
-  console.log(`[DEBUG] After boolean parsing: bold=${params.bold}, outline=${params.outline}`);
+  params.background = parseBooleanParam(params.background);
   
-  // 🎯 ИСПРАВЛЕНИЕ: Создаем backcolour в том же формате, что в рабочих стилях
-  let backcolour = null;
-  if (params.background && params.background.trim() !== "") {
-    console.log(`[DEBUG] Processing background: "${params.background}"`);
-    
-    // Убираем # если есть
-    let cleanColor = params.background.replace('#', '').toLowerCase();
-    
-    if (/^[0-9a-f]{6}$/i.test(cleanColor)) {
-      // 🎯 НОВОЕ: 100% непрозрачный фон вместо полупрозрачного
-      backcolour = `&H00${cleanColor.toUpperCase()}`;  // 00 = полностью непрозрачный
-      console.log(`[DEBUG] ✅ Created SOLID backcolour: ${backcolour} (fully opaque)`);
-    } else if (/^[0-9a-f]{3}$/i.test(cleanColor)) {
-      // 3-значный HEX
-      const expandedHex = cleanColor.split('').map(char => char + char).join('');
-      backcolour = `&H00${expandedHex.toUpperCase()}`;  // 00 = полностью непрозрачный
-      console.log(`[DEBUG] ✅ Created SOLID backcolour from short hex: ${backcolour}`);
-    } else if (/^[0-9a-f]{8}$/i.test(cleanColor)) {
-      // 8-значный HEX с альфой
-      const alpha = cleanColor.substring(6, 8);
-      const color = cleanColor.substring(0, 6);
-      backcolour = `&H${alpha.toUpperCase()}${color.toUpperCase()}`;
-      console.log(`[DEBUG] ✅ Created backcolour with custom alpha: ${backcolour}`);
-    }
-  }
+  console.log(`[DEBUG] After boolean parsing: bold=${params.bold}, outline=${params.outline}, background=${params.background}`);
   
   if (!['bottom', 'top', 'center'].includes(params.position)) {
     console.log(`[DEBUG] Invalid position "${params.position}", using default "bottom"`);
     params.position = 'bottom';
   }
   
+  console.log(`[DEBUG] Final params after validation:`, params);
+  
   // Применяем позицию
   const positionSettings = SUBTITLE_POSITIONS[params.position];
   
-  // 🎯 СТРОИМ ФИНАЛЬНЫЙ СТИЛЬ КАК В РАБОЧИХ ГОТОВЫХ СТИЛЯХ
+  // Строим финальный стиль
   const style = {
     fontsize: params.fontsize,
     fontcolor: params.fontcolor,
-    fontname: 'DejaVu Sans',  // Фиксированный шрифт как в рабочих стилях
+    fontname: AVAILABLE_FONTS[0], // Используем первый доступный шрифт
+    fontnames: AVAILABLE_FONTS,   // Список для fallback
     bold: params.bold ? 1 : 0,
     alignment: positionSettings.alignment,
     marginv: positionSettings.marginv
   };
   
-  // Добавляем обводку если включена (как в рабочих стилях)
+  console.log(`[DEBUG] Base style created:`, style);
+  
+  // Добавляем обводку если включена
   if (params.outline) {
-    style.outline = 2;  // Фиксированные значения как в tiktok_classic
-    style.shadow = 1;
+    style.outline = 2;  // Фиксированная толщина 2px
+    style.shadow = 1;   // Легкая тень для лучшей читаемости
     console.log(`[DEBUG] ✅ OUTLINE ENABLED: Added outline=2, shadow=1`);
   } else {
     style.outline = 0;
@@ -270,20 +142,43 @@ function buildCustomStyle(styleParams) {
     console.log(`[DEBUG] ❌ OUTLINE DISABLED: outline=0, shadow=0`);
   }
   
-  // 🎯 КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: добавляем backcolour точно так же, как в рабочих стилях
-  if (backcolour) {
-    style.backcolour = backcolour;
-    console.log(`[DEBUG] ✅ BACKGROUND ENABLED: Added backcolour=${backcolour} (same format as working styles)`);
+  // Добавляем фон если включен
+  if (params.background) {
+    style.backcolour = '&H80000000';  // Черный с 50% прозрачностью
+    console.log(`[DEBUG] ✅ BACKGROUND ENABLED: Added backcolour=&H80000000`);
   } else {
     console.log(`[DEBUG] ❌ BACKGROUND DISABLED: no backcolour`);
   }
   
-  console.log(`[DEBUG] Final style object (matching working style format):`, style);
+  console.log(`[DEBUG] Final style object:`, style);
   
   return {
     style,
-    description: `Custom style: ${params.fontsize}px, ${params.fontcolor}, ${params.position}, outline: ${params.outline}, bg: ${backcolour ? 'enabled' : 'disabled'}, bold: ${params.bold}`
+    description: `Custom style: ${params.fontsize}px, ${params.fontcolor}, ${params.position}, outline: ${params.outline}, bg: ${params.background}, bold: ${params.bold}`
   };
+}
+
+// 🔧 HELPER ФУНКЦИЯ ДЛЯ ПАРСИНГА BOOLEAN ПАРАМЕТРОВ
+function parseBooleanParam(value) {
+  console.log(`[DEBUG] parseBooleanParam called with: "${value}" (type: ${typeof value})`);
+  
+  if (typeof value === 'boolean') {
+    console.log(`[DEBUG] Already boolean: ${value}`);
+    return value;
+  }
+  if (typeof value === 'string') {
+    const lowercased = value.toLowerCase().trim();
+    const result = lowercased === 'true' || lowercased === '1' || lowercased === 'yes';
+    console.log(`[DEBUG] String "${value}" -> lowercased "${lowercased}" -> result: ${result}`);
+    return result;
+  }
+  if (typeof value === 'number') {
+    const result = value !== 0;
+    console.log(`[DEBUG] Number ${value} -> result: ${result}`);
+    return result;
+  }
+  console.log(`[DEBUG] Unknown type, defaulting to false`);
+  return false;
 }
 
 // 🎯 ФУНКЦИЯ АНАЛИЗА КАЧЕСТВА ИСХОДНОГО ВИДЕО
@@ -332,13 +227,15 @@ function analyzeVideoQuality(inputPath) {
 
 // 🎯 ВЫБОР ОПТИМАЛЬНЫХ НАСТРОЕК НА ОСНОВЕ force_quality
 function getQualitySettings(forceQuality, videoQuality) {
+  console.log(`[DEBUG] getQualitySettings called with: ${forceQuality}`);
+  
   let settings;
   
   switch(forceQuality) {
     case 'lossless':
       settings = {
-        crf: 0,
-        preset: 'slow',
+        crf: 0,              // Полностью без потерь
+        preset: 'slow',      // Медленное = лучшее качество
         tune: 'film',
         profile: 'high',
         level: '5.1',
@@ -348,7 +245,7 @@ function getQualitySettings(forceQuality, videoQuality) {
       
     case 'ultra':
       settings = {
-        crf: 8,
+        crf: 8,              // Экстремально высокое качество
         preset: 'slow',
         tune: 'film',
         profile: 'high',
@@ -359,7 +256,7 @@ function getQualitySettings(forceQuality, videoQuality) {
       
     case 'high':
       settings = {
-        crf: 12,
+        crf: 12,             // Очень высокое качество
         preset: 'medium',
         tune: 'film',
         profile: 'high',
@@ -370,7 +267,7 @@ function getQualitySettings(forceQuality, videoQuality) {
       
     case 'medium':
       settings = {
-        crf: 18,
+        crf: 18,             // Хорошее качество
         preset: 'medium',
         tune: null,
         profile: 'main',
@@ -381,7 +278,7 @@ function getQualitySettings(forceQuality, videoQuality) {
       
     case 'low':
       settings = {
-        crf: 28,
+        crf: 28,             // Заметно низкое качество
         preset: 'fast',
         tune: null,
         profile: 'baseline',
@@ -405,6 +302,7 @@ function getQualitySettings(forceQuality, videoQuality) {
       break;
   }
   
+  console.log(`[DEBUG] Selected settings:`, settings);
   return settings;
 }
 
@@ -416,7 +314,7 @@ app.get('/health', (req, res) => {
     status: 'healthy', 
     timestamp: new Date().toISOString(),
     mode: 'CUSTOM_STYLES_WITH_MAXIMUM_QUALITY_STREAMING',
-    style_system: 'ASS_V4_PLUS_WITH_BACKGROUND_SUPPORT',
+    style_system: 'CUSTOM_PARAMETERS_ONLY',
     available_fonts: AVAILABLE_FONTS,
     available_positions: Object.keys(SUBTITLE_POSITIONS),
     quality_mode: 'NO_COMPRESSION_MAXIMUM_QUALITY_STREAMING_ENABLED',
@@ -426,29 +324,10 @@ app.get('/health', (req, res) => {
       bold: 'boolean',
       outline: 'boolean',
       position: 'string (bottom/top/center)',
-      background: 'string (hex color) or empty string to disable'
-    },
-    background_color_formats: {
-      disabled: '""  (empty string)',
-      hex_6digit: '"ff0000", "00ff00", "0000ff"',
-      hex_3digit: '"f00", "0f0", "00f"', 
-      hex_8digit_with_alpha: '"ff000080" (color + alpha channel)'
-    },
-    background_examples: {
-      no_background: 'background: ""',
-      red_solid: 'background: "ff0000"',
-      green_solid: 'background: "00ff00"',
-      blue_solid: 'background: "0000ff"',
-      red_transparent: 'background: "ff000080"',
-      custom_color: 'background: "ff8040"'
-    },
-    ass_info: {
-      format: 'ASS V4+ with BorderStyle=3 for opaque background',
-      background_method: 'BackColour parameter in ASS style definition',
-      fallback_test: 'Command 5 uses drawtext with visible red box for testing'
+      background: 'boolean'
     },
     endpoints: [
-      '/process-video-stream (ASS format with background support)',
+      '/process-video-stream (Custom styles - JSON response)',
       '/health (This endpoint)'
     ],
     ...systemInfo
@@ -471,7 +350,7 @@ function getSystemInfo() {
       ffmpeg_available: true,
       ffmpeg_version: ffmpegVersion,
       fonts_available: availableFonts,
-      subtitle_method: 'CUSTOM_STYLES_WITH_HEX_BACKGROUND'
+      subtitle_method: 'CUSTOM_STYLES_WITH_JSON_RESPONSE'
     };
   } catch (error) {
     return { 
@@ -481,130 +360,92 @@ function getSystemInfo() {
   }
 }
 
-// Функция конвертации SRT в ASS с кастомными стилями
-function convertSRTtoASS(srtContent, customStyle, taskId) {
-  console.log(`[${taskId}] 🎨 Converting SRT to ASS with custom styles...`);
+// Функция очистки и красивого форматирования SRT
+function beautifySRT(srtContent, taskId) {
+  console.log(`[${taskId}] Beautifying SRT text...`);
+  console.log(`[${taskId}] Original SRT length: ${srtContent.length} chars`);
   
-  // Парсим SRT
-  const srtLines = srtContent.trim().split('\n');
-  const subtitles = [];
-  
-  let i = 0;
-  while (i < srtLines.length) {
-    if (/^\d+$/.test(srtLines[i].trim())) {
-      const index = parseInt(srtLines[i].trim());
-      i++;
-      
-      if (i < srtLines.length && srtLines[i].includes('-->')) {
-        const timeLine = srtLines[i].trim();
-        const [startTime, endTime] = timeLine.split(' --> ');
-        i++;
-        
-        // Собираем текст субтитра
-        let text = '';
-        while (i < srtLines.length && srtLines[i].trim() !== '') {
-          if (text) text += '\\N'; // ASS line break
-          text += srtLines[i].trim();
-          i++;
-        }
-        
-        if (text) {
-          subtitles.push({
-            index,
-            start: convertTimeToASS(startTime),
-            end: convertTimeToASS(endTime),
-            text: text
-          });
-        }
-      }
-    }
-    i++;
+  if (!srtContent || srtContent.length < 10) {
+    throw new Error('SRT content is empty or too short');
   }
   
-  console.log(`[${taskId}] 🎨 Parsed ${subtitles.length} subtitles from SRT`);
+  // Проверяем, что это SRT формат
+  if (!srtContent.includes('-->')) {
+    console.log(`[${taskId}] ⚠️ Invalid SRT format - converting plain text to SRT`);
+    return `1\n00:00:00,000 --> 00:00:10,000\n${srtContent.trim()}\n\n`;
+  }
   
-  // Создаем ASS файл с кастомным стилем
-  const assContent = generateASSContent(subtitles, customStyle, taskId);
+  // Очищаем SRT
+  let beautifiedSrt = srtContent
+    .replace(/\r\n/g, '\n')  // Унифицируем переносы строк
+    .replace(/\r/g, '\n')
+    .trim();
   
-  console.log(`[${taskId}] 🎨 Generated ASS content (${assContent.length} chars)`);
+  // Улучшаем форматирование текста
+  const lines = beautifiedSrt.split('\n');
+  const improvedLines = [];
   
-  return assContent;
-}
-
-// Конвертация времени из SRT формата в ASS
-function convertTimeToASS(srtTime) {
-  // SRT: 00:00:01,500 -> ASS: 0:00:01.50
-  return srtTime.replace(',', '.').replace(/^0/, '');
-}
-
-// Генерация ASS контента с кастомными стилями
-function generateASSContent(subtitles, customStyle, taskId) {
-  console.log(`[${taskId}] 🎨 Generating ASS with style:`, customStyle);
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    if (line.includes('-->')) {
+      // Временные метки оставляем как есть
+      improvedLines.push(line);
+    } else if (/^\d+$/.test(line)) {
+      // Номера субтитров оставляем как есть
+      improvedLines.push(line);
+    } else if (line.length > 0) {
+      // Улучшаем текст субтитров
+      let improvedText = line;
+      
+      // Убираем лишние пробелы
+      improvedText = improvedText.replace(/\s+/g, ' ').trim();
+      
+      // Исправляем пунктуацию
+      improvedText = improvedText.replace(/\s+([,.!?;:])/g, '$1');
+      improvedText = improvedText.replace(/([,.!?;:])\s*/g, '$1 ');
+      
+      // Добавляем красивые кавычки если нужно
+      improvedText = improvedText.replace(/"/g, '«').replace(/"/g, '»');
+      
+      // Если текст очень длинный, добавляем переносы в естественных местах
+      if (improvedText.length > 50) {
+        const words = improvedText.split(' ');
+        if (words.length > 8) {
+          const mid = Math.ceil(words.length / 2);
+          // Ищем хорошее место для переноса (после запятой, точки и т.д.)
+          let splitPoint = mid;
+          for (let j = mid - 2; j <= mid + 2 && j < words.length; j++) {
+            if (j > 0 && (words[j-1].endsWith(',') || words[j-1].endsWith('.') || words[j-1].endsWith('!'))) {
+              splitPoint = j;
+              break;
+            }
+          }
+          const firstLine = words.slice(0, splitPoint).join(' ');
+          const secondLine = words.slice(splitPoint).join(' ');
+          improvedText = firstLine + '\n' + secondLine;
+        }
+      }
+      
+      improvedLines.push(improvedText);
+    } else {
+      // Пустые строки
+      improvedLines.push('');
+    }
+  }
   
-  // Правильный порядок полей для ASS Style
-  // Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+  beautifiedSrt = improvedLines.join('\n');
   
-  const fontname = customStyle.fontname || 'Arial';
-  const fontsize = customStyle.fontsize || 8;
-  const primaryColour = customStyle.fontcolor ? `&H${customStyle.fontcolor.toUpperCase()}` : '&HFFFFFF';
-  const secondaryColour = '&H000000';  // Вторичный цвет
-  const outlineColour = '&H000000';    // Цвет обводки (черный)
-  const backColour = customStyle.backcolour || '&H80000000';  // Фон с альфой
-  const bold = customStyle.bold ? 1 : 0;
-  const italic = 0;
-  const underline = 0;
-  const strikeout = 0;
-  const scaleX = 100;
-  const scaleY = 100;
-  const spacing = 0;
-  const angle = 0;
-  const borderStyle = 1;  // 1 = outline+shadow, 3 = opaque box
-  const outline = customStyle.outline || 0;
-  const shadow = customStyle.shadow || 0;
-  const alignment = customStyle.alignment || 2;
-  const marginL = 10;
-  const marginR = 10;
-  const marginV = customStyle.marginv || 15;
-  const encoding = 1;
+  // Убеждаемся, что SRT заканчивается правильно
+  if (!beautifiedSrt.endsWith('\n\n')) {
+    beautifiedSrt += '\n\n';
+  }
   
-  // ВАЖНО: Если есть фон, используем BorderStyle = 3 (opaque box)
-  const actualBorderStyle = customStyle.backcolour ? 3 : 1;
+  console.log(`[${taskId}] ✅ SRT beautification complete`);
+  console.log(`[${taskId}] Beautified length: ${beautifiedSrt.length} chars`);
+  console.log(`[${taskId}] Preview:`, beautifiedSrt.substring(0, 300));
   
-  console.log(`[${taskId}] 🎨 ASS Style parameters:`);
-  console.log(`[${taskId}] 🎨   Fontname: ${fontname}`);
-  console.log(`[${taskId}] 🎨   Fontsize: ${fontsize}`);
-  console.log(`[${taskId}] 🎨   PrimaryColour: ${primaryColour}`);
-  console.log(`[${taskId}] 🎨   BackColour: ${backColour}`);
-  console.log(`[${taskId}] 🎨   BorderStyle: ${actualBorderStyle} ${actualBorderStyle === 3 ? '(opaque box for background)' : '(outline+shadow)'}`);
-  console.log(`[${taskId}] 🎨   Outline: ${outline}`);
-  console.log(`[${taskId}] 🎨   Alignment: ${alignment}`);
-  
-  // ASS заголовок
-  let ass = `[Script Info]
-Title: Custom Subtitles
-ScriptType: v4.00+
-
-[V4+ Styles]
-Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,${fontname},${fontsize},${primaryColour},${secondaryColour},${outlineColour},${backColour},${bold},${italic},${underline},${strikeout},${scaleX},${scaleY},${spacing},${angle},${actualBorderStyle},${outline},${shadow},${alignment},${marginL},${marginR},${marginV},${encoding}
-
-[Events]
-Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-`;
-
-  // Добавляем субтитры
-  subtitles.forEach(sub => {
-    ass += `Dialogue: 0,${sub.start},${sub.end},Default,,0,0,0,,${sub.text}\n`;
-  });
-  
-  console.log(`[${taskId}] 🎨 Final ASS Style line:`);
-  const styleLine = `Style: Default,${fontname},${fontsize},${primaryColour},${secondaryColour},${outlineColour},${backColour},${bold},${italic},${underline},${strikeout},${scaleX},${scaleY},${spacing},${angle},${actualBorderStyle},${outline},${shadow},${alignment},${marginL},${marginR},${marginV},${encoding}`;
-  console.log(`[${taskId}] 🎨 ${styleLine}`);
-  
-  console.log(`[${taskId}] 🎨 Full ASS content preview:`);
-  console.log(`[${taskId}] 🎨 ${ass.substring(0, 500)}...`);
-  
-  return ass;
+  return beautifiedSrt;
 }
 
 // 🚀 ОСНОВНОЙ STREAMING ENDPOINT С КАСТОМНЫМИ СТИЛЯМИ
@@ -612,7 +453,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
   const taskId = req.body.task_id || uuidv4();
   const startTime = Date.now();
   
-  console.log(`\n=== [${taskId}] CUSTOM STYLE PROCESSING WITH HEX BACKGROUND ===`);
+  console.log(`\n=== [${taskId}] CUSTOM STYLE PROCESSING (VALIDATED JSON) ===`);
 
   try {
     // Валидация входных данных
@@ -648,6 +489,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     const forceQuality = req.body.force_quality || 'auto';
     
     console.log(`[${taskId}] Video size: ${(videoBuffer.length / 1024 / 1024).toFixed(2)}MB`);
+    console.log(`[${taskId}] Raw SRT length: ${rawSrtContent.length} chars`);
     console.log(`[${taskId}] 🎨 RAW INCOMING STYLE PARAMS:`);
     console.log(`[${taskId}]   fontsize: "${styleParams.fontsize}" (type: ${typeof styleParams.fontsize})`);
     console.log(`[${taskId}]   fontcolor: "${styleParams.fontcolor}" (type: ${typeof styleParams.fontcolor})`);
@@ -660,6 +502,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     // 🎨 СОЗДАЕМ КАСТОМНЫЙ СТИЛЬ
     const { style: selectedStyle, description: styleDescription } = buildCustomStyle(styleParams);
     console.log(`[${taskId}] ✅ Built custom style: ${styleDescription}`);
+    console.log(`[${taskId}] 📋 Final style:`, selectedStyle);
 
     // Создаем временные файлы
     const tempDir = '/tmp/processing';
@@ -687,120 +530,83 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     const optimalSettings = getQualitySettings(forceQuality, videoQuality);
     console.log(`[${taskId}] ⚙️ Quality settings:`, optimalSettings);
 
-    // 🎨 КОНВЕРТИРУЕМ SRT В ASS С КАСТОМНЫМИ СТИЛЯМИ
-    const assContent = convertSRTtoASS(rawSrtContent, selectedStyle, taskId);
-    const assPath = path.join(tempDir, `stream_subtitles_${taskId}.ass`);
-    fs.writeFileSync(assPath, assContent, 'utf8');
-    console.log(`[${taskId}] 🎨 ASS file saved: ${assPath}`);
-    
-    // 🔍 ДЕБАГ: Выводим содержимое ASS файла для проверки
-    console.log(`[${taskId}] 🔍 ASS FILE CONTENT:`);
-    console.log(assContent);
-    console.log(`[${taskId}] 🔍 END OF ASS FILE`);
+    // Beautify SRT
+    const beautifiedSRT = beautifySRT(rawSrtContent, taskId);
+    fs.writeFileSync(srtPath, beautifiedSRT, 'utf8');
 
-    // 🎨 СОЗДАЕМ FALLBACK SRT НА СЛУЧАЙ ПРОБЛЕМ С ASS
-    const srtContent = rawSrtContent
-      .replace(/\r\n/g, '\n')
-      .replace(/\r/g, '\n')
-      .trim();
-    fs.writeFileSync(srtPath, srtContent, 'utf8');
-
-    // 🎨 СТРОИМ КОМАНДЫ С DRAWTEXT ДЛЯ СОЗДАНИЯ ФОНА (ОДИН ТЕКСТ С ФОНОМ)
-    const commands = [];
-    
-    // Если есть фон - используем ТОЛЬКО drawtext (без subtitles поверх)
-    if (selectedStyle.backcolour) {
-      console.log(`[${taskId}] 🎨 Creating single text with background using drawtext`);
+    // 🎨 СТРОИМ STYLE STRING ДЛЯ FFMPEG
+    const buildStyleString = (style) => {
+      let styleStr = `Fontsize=${style.fontsize}`;
       
-      // Конвертируем backcolour в RGB для drawtext
-      let rgbColor = 'red'; // default
-      if (selectedStyle.backcolour && selectedStyle.backcolour.includes('FF0000')) {
-        rgbColor = 'red';
-      } else if (selectedStyle.backcolour && selectedStyle.backcolour.includes('00FF00')) {
-        rgbColor = 'green';
-      } else if (selectedStyle.backcolour && selectedStyle.backcolour.includes('0000FF')) {
-        rgbColor = 'blue';
-      } else if (selectedStyle.backcolour && selectedStyle.backcolour.includes('FFFF00')) {
-        rgbColor = 'yellow';
-      } else if (selectedStyle.backcolour && selectedStyle.backcolour.includes('000000')) {
-        rgbColor = 'black';
-      } else if (selectedStyle.backcolour && selectedStyle.backcolour.includes('FFFFFF')) {
-        rgbColor = 'white';
+      if (style.fontname) {
+        styleStr += `,Fontname=${style.fontname}`;
       }
       
-      console.log(`[${taskId}] 🎨 Using drawtext background color: ${rgbColor}`);
-      
-      // Читаем SRT для извлечения текста
-      const srtContent = fs.readFileSync(srtPath, 'utf8');
-      let subtitleText = 'Текст субтитра';
-      
-      // Простое извлечение текста из SRT
-      const srtLines = srtContent.split('\n');
-      for (let line of srtLines) {
-        const trimmed = line.trim();
-        if (trimmed && !trimmed.includes('-->') && !/^\d+$/.test(trimmed)) {
-          subtitleText = trimmed;
-          break;
-        }
+      if (style.fontcolor) {
+        const color = style.fontcolor.startsWith('&H') ? style.fontcolor : `&H${style.fontcolor}`;
+        styleStr += `,PrimaryColour=${color}`;
       }
       
-      console.log(`[${taskId}] 🎨 Extracted subtitle text: "${subtitleText}"`);
+      if (style.outline && style.outline > 0) {
+        styleStr += `,OutlineColour=&H000000,Outline=${style.outline}`;
+      }
       
-      // Команда 1: Один drawtext с фоном (позиция снизу)
-      commands.push(
-        `ffmpeg -i "${inputVideoPath}" -vf "drawtext=text='${subtitleText}':fontcolor=white:fontsize=${selectedStyle.fontsize * 3}:box=1:boxcolor=${rgbColor}@0.8:boxborderw=8:x=(w-text_w)/2:y=h-text_h-30" -c:a copy -c:v libx264 -preset ${optimalSettings.preset} -crf ${optimalSettings.crf} -pix_fmt yuv420p${optimalSettings.tune ? ` -tune ${optimalSettings.tune}` : ''} -profile:v ${optimalSettings.profile}${optimalSettings.level ? ` -level ${optimalSettings.level}` : ''} -movflags +faststart -y "${outputVideoPath}"`
-      );
+      if (style.shadow && style.shadow > 0) {
+        styleStr += `,Shadow=${style.shadow}`;
+      }
       
-      // Команда 2: Один drawtext с фоном (центр экрана для лучшей видимости)
-      commands.push(
-        `ffmpeg -i "${inputVideoPath}" -vf "drawtext=text='${subtitleText}':fontcolor=white:fontsize=${selectedStyle.fontsize * 4}:box=1:boxcolor=${rgbColor}@0.9:boxborderw=12:x=(w-text_w)/2:y=(h-text_h)/2" -c:a copy -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -movflags +faststart -y "${outputVideoPath}"`
-      );
+      if (style.bold) {
+        styleStr += `,Bold=${style.bold}`;
+      }
       
-      // Команда 3: Тест с фиксированным текстом для отладки
-      commands.push(
-        `ffmpeg -i "${inputVideoPath}" -vf "drawtext=text='ТЕСТ ФОНА':fontcolor=white:fontsize=32:box=1:boxcolor=${rgbColor}@1.0:boxborderw=10:x=(w-text_w)/2:y=h-100" -c:a copy -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -y "${outputVideoPath}"`
-      );
+      if (style.alignment) {
+        styleStr += `,Alignment=${style.alignment}`;
+      }
       
-    } else {
-      console.log(`[${taskId}] 🎨 No background - using regular subtitles`);
-    }
+      if (style.marginv !== undefined) {
+        styleStr += `,MarginV=${style.marginv}`;
+      }
+      
+      if (style.backcolour) {
+        styleStr += `,BackColour=${style.backcolour}`;
+      }
+      
+      return styleStr;
+    };
+
+    const styleString = buildStyleString(selectedStyle);
+    console.log(`[${taskId}] 🎨 FFmpeg style string: ${styleString}`);
+
+    // Строим FFmpeg команды с fallback логикой
+    const mainCommand = `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${styleString}'" -c:a copy -c:v libx264 -preset ${optimalSettings.preset} -crf ${optimalSettings.crf} -pix_fmt yuv420p${optimalSettings.tune ? ` -tune ${optimalSettings.tune}` : ''} -profile:v ${optimalSettings.profile}${optimalSettings.level ? ` -level ${optimalSettings.level}` : ''} -movflags +faststart -y "${outputVideoPath}"`;
+
+    // Создаем fallback команды с упрощенными стилями
+    const simplifiedStyleString = `Fontname=DejaVu Sans,Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${selectedStyle.outline || 2}`;
     
-    // Добавляем fallback команды без фона
-    commands.push(
-      // ASS файл напрямую
-      `ffmpeg -i "${inputVideoPath}" -vf "ass='${assPath}'" -c:a copy -c:v libx264 -preset ${optimalSettings.preset} -crf ${optimalSettings.crf} -pix_fmt yuv420p${optimalSettings.tune ? ` -tune ${optimalSettings.tune}` : ''} -profile:v ${optimalSettings.profile}${optimalSettings.level ? ` -level ${optimalSettings.level}` : ''} -movflags +faststart -y "${outputVideoPath}"`,
-      
-      // Fallback с subtitles фильтром
+    const commands = [
+      mainCommand,
+      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${styleString}'" -c:a copy -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -movflags +faststart -y "${outputVideoPath}"`,
+      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${simplifiedStyleString}'" -c:a copy -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -y "${outputVideoPath}"`,
       `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}'" -c:a copy -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -y "${outputVideoPath}"`
-    );
-
-    console.log(`[${taskId}] 🔧 FFMPEG COMMANDS WITH SINGLE TEXT + BACKGROUND:`);
-    commands.forEach((cmd, index) => {
-      console.log(`[${taskId}] Command ${index + 1}: ${cmd}`);
-    });
+    ];
 
     let success = false;
     let usedCommand = 0;
-    let lastError = null;
 
     // Выполняем команды ПОСЛЕДОВАТЕЛЬНО
     for (let i = 0; i < commands.length && !success; i++) {
       try {
         console.log(`[${taskId}] 🎨 Trying custom style method ${i + 1}...`);
-        console.log(`[${taskId}] 🔧 Executing: ${commands[i]}`);
         
         if (fs.existsSync(outputVideoPath)) fs.unlinkSync(outputVideoPath);
         
         const cmdStartTime = Date.now();
-        const result = execSync(commands[i], { 
+        execSync(commands[i], { 
           stdio: 'pipe',
           timeout: 600000,
-          maxBuffer: 1024 * 1024 * 200,
-          encoding: 'utf8'
+          maxBuffer: 1024 * 1024 * 200
         });
         const cmdDuration = Date.now() - cmdStartTime;
-        
-        console.log(`[${taskId}] 🔧 FFmpeg output: ${result}`);
         
         if (fs.existsSync(outputVideoPath)) {
           const outputSize = fs.statSync(outputVideoPath).size;
@@ -814,8 +620,6 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
         }
       } catch (error) {
         console.log(`[${taskId}] ❌ Custom style method ${i + 1} failed:`, error.message);
-        console.log(`[${taskId}] 🔧 FFmpeg stderr: ${error.stderr || 'No stderr'}`);
-        lastError = error;
       }
     }
 
@@ -840,6 +644,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
 
     // Читаем файл как binary buffer
     const processedVideoBuffer = fs.readFileSync(outputVideoPath);
+    console.log(`[${taskId}] 📖 File read successfully: ${processedVideoBuffer.length} bytes`);
 
     // Проверяем MP4 header
     const mp4Header = processedVideoBuffer.slice(0, 12);
@@ -854,6 +659,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
 
     // Создаем Base64 с explicit encoding
     const base64Data = processedVideoBuffer.toString('base64');
+    console.log(`[${taskId}] 🔢 Base64 created: ${base64Data.length} chars`);
 
     // Валидируем Base64
     const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
@@ -861,18 +667,22 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
       throw new Error('Invalid Base64 data generated');
     }
 
+    console.log(`[${taskId}] ✅ Base64 validation passed`);
+
     const processingTime = Date.now() - startTime;
     const sizeChange = ((processedVideoBuffer.length / videoBuffer.length) - 1) * 100;
 
     console.log(`[${taskId}] Processing time: ${processingTime}ms`);
     console.log(`[${taskId}] Size change: ${sizeChange > 0 ? '+' : ''}${sizeChange.toFixed(1)}%`);
     console.log(`[${taskId}] Quality mode: ${optimalSettings.description}`);
+    console.log(`[${taskId}] 🚀 Sending validated JSON response...`);
 
     // Очистка временных файлов
-    [inputVideoPath, srtPath, assPath, outputVideoPath].forEach(filePath => {
+    [inputVideoPath, srtPath, outputVideoPath].forEach(filePath => {
       try {
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath);
+          console.log(`[${taskId}] 🗑️ Deleted: ${path.basename(filePath)}`);
         }
       } catch (err) {
         console.warn(`[${taskId}] Failed to delete: ${filePath}`);
@@ -905,11 +715,11 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
         encoding: 'base64'
       },
       style_info: {
-        type: 'custom_ass',
+        type: 'custom',
         description: styleDescription,
         parameters: styleParams,
         final_style: selectedStyle,
-        ass_style_format: 'ASS V4+ Style with BackColour support',
+        ffmpeg_style_string: styleString,
         position_name: SUBTITLE_POSITIONS[styleParams.position || 'bottom'].name
       },
       quality_info: {
@@ -935,7 +745,6 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     const tempFiles = [
       `/tmp/processing/stream_input_${taskId}.mp4`,
       `/tmp/processing/stream_subtitles_${taskId}.srt`,
-      `/tmp/processing/stream_subtitles_${taskId}.ass`,
       `/tmp/processing/stream_output_${taskId}.mp4`
     ];
     
@@ -958,18 +767,14 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
 const server = app.listen(PORT, () => {
   console.log(`🎨 CUSTOM STYLE Subtitle Service running on port ${PORT} 🎨`);
   console.log(`📱 Ready for custom subtitle styles with MAXIMUM QUALITY!`);
-  console.log(`🎯 Style system: CUSTOM_PARAMETERS_WITH_HEX_BACKGROUND`);
+  console.log(`🎯 Style system: CUSTOM_PARAMETERS_ONLY`);
   console.log(`✨ Available parameters:`);
   console.log(`   • fontsize (6-12) - Text size`);
   console.log(`   • fontcolor (hex) - Text color`);
   console.log(`   • bold (true/false) - Bold text`);
   console.log(`   • outline (true/false) - Text outline`);
   console.log(`   • position (bottom/top/center) - Text position`);
-  console.log(`   • background (hex color or empty) - Background color`);
-  console.log(`🎯 Background examples:`);
-  console.log(`   • "" - No background`);
-  console.log(`   • "ff0000" - Red solid background`);
-  console.log(`   • "00ff0080" - Green with 50% transparency`);
+  console.log(`   • background (true/false) - Black transparent background`);
   console.log(`🎯 Quality modes available:`);
   console.log(`   • auto - Adaptive quality based on input analysis`);
   console.log(`   • lossless - Perfect quality preservation (CRF 0)`);
@@ -978,11 +783,11 @@ const server = app.listen(PORT, () => {
   console.log(`   • medium - Medium quality (CRF 18)`);
   console.log(`   • low - Low quality for testing (CRF 28)`);
   console.log(`🚀 Endpoints available:`);
-  console.log(`   • POST /process-video-stream (Custom styles - HEX background)`);
+  console.log(`   • POST /process-video-stream (Custom styles - Validated JSON)`);
   console.log(`   • GET /health (System status)`);
   const systemInfo = getSystemInfo();
   console.log(`FFmpeg: ${systemInfo.ffmpeg_available}`);
-  console.log(`Quality Mode: CUSTOM_STYLES_WITH_HEX_BACKGROUND_SUPPORT`);
+  console.log(`Quality Mode: CUSTOM_STYLES_WITH_MP4_VERIFICATION`);
 });
 
 // Увеличиваем timeout сервера
