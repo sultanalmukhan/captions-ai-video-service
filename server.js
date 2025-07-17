@@ -536,6 +536,8 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
 
     // 🎨 СТРОИМ STYLE STRING ДЛЯ FFMPEG
     const buildStyleString = (style) => {
+      console.log(`[${taskId}] 🔧 Building FFmpeg style string from:`, style);
+      
       let styleStr = `Fontsize=${style.fontsize}`;
       
       if (style.fontname) {
@@ -549,14 +551,17 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
       
       if (style.outline && style.outline > 0) {
         styleStr += `,OutlineColour=&H000000,Outline=${style.outline}`;
+        console.log(`[${taskId}] ✅ Added outline to FFmpeg: Outline=${style.outline}`);
       }
       
       if (style.shadow && style.shadow > 0) {
         styleStr += `,Shadow=${style.shadow}`;
+        console.log(`[${taskId}] ✅ Added shadow to FFmpeg: Shadow=${style.shadow}`);
       }
       
       if (style.bold) {
         styleStr += `,Bold=${style.bold}`;
+        console.log(`[${taskId}] ✅ Added bold to FFmpeg: Bold=${style.bold}`);
       }
       
       if (style.alignment) {
@@ -567,21 +572,31 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
         styleStr += `,MarginV=${style.marginv}`;
       }
       
+      // 🔍 СПЕЦИАЛЬНАЯ ОТЛАДКА ДЛЯ BACKGROUND
       if (style.backcolour) {
         styleStr += `,BackColour=${style.backcolour}`;
+        console.log(`[${taskId}] ✅ BACKGROUND ADDED TO FFMPEG: BackColour=${style.backcolour}`);
+      } else {
+        console.log(`[${taskId}] ❌ BACKGROUND NOT ADDED: style.backcolour is "${style.backcolour}"`);
+        console.log(`[${taskId}] 🔍 Full style object for background debug:`, JSON.stringify(style, null, 2));
       }
       
       return styleStr;
     };
 
     const styleString = buildStyleString(selectedStyle);
-    console.log(`[${taskId}] 🎨 FFmpeg style string: ${styleString}`);
+    console.log(`[${taskId}] 🎨 Final FFmpeg style string: "${styleString}"`);
+    console.log(`[${taskId}] 🔍 Style string length: ${styleString.length} chars`);
+    console.log(`[${taskId}] 🔍 Contains BackColour: ${styleString.includes('BackColour')}`);
 
     // Строим FFmpeg команды с fallback логикой
     const mainCommand = `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${styleString}'" -c:a copy -c:v libx264 -preset ${optimalSettings.preset} -crf ${optimalSettings.crf} -pix_fmt yuv420p${optimalSettings.tune ? ` -tune ${optimalSettings.tune}` : ''} -profile:v ${optimalSettings.profile}${optimalSettings.level ? ` -level ${optimalSettings.level}` : ''} -movflags +faststart -y "${outputVideoPath}"`;
 
     // Создаем fallback команды с упрощенными стилями
-    const simplifiedStyleString = `Fontname=DejaVu Sans,Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${selectedStyle.outline || 2}`;
+    const simplifiedStyleString = `Fontname=DejaVu Sans,Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${selectedStyle.outline || 2}${selectedStyle.backcolour ? `,BackColour=${selectedStyle.backcolour}` : ''}`;
+    
+    console.log(`[${taskId}] 🔧 Simplified fallback style: "${simplifiedStyleString}"`);
+    console.log(`[${taskId}] 🔍 Fallback contains BackColour: ${simplifiedStyleString.includes('BackColour')}`);
     
     const commands = [
       mainCommand,
@@ -589,6 +604,11 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
       `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${simplifiedStyleString}'" -c:a copy -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -y "${outputVideoPath}"`,
       `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}'" -c:a copy -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -y "${outputVideoPath}"`
     ];
+
+    console.log(`[${taskId}] 🚀 Will try ${commands.length} FFmpeg commands:`);
+    commands.forEach((cmd, i) => {
+      console.log(`[${taskId}] Command ${i + 1}: ${cmd.substring(0, 150)}...`);
+    });
 
     let success = false;
     let usedCommand = 0;
