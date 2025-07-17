@@ -460,89 +460,89 @@ function getSystemInfo() {
   }
 }
 
-// Функция очистки и красивого форматирования SRT
-function beautifySRT(srtContent, taskId) {
-  console.log(`[${taskId}] Beautifying SRT text...`);
+// Функция конвертации SRT в ASS с кастомными стилями
+function convertSRTtoASS(srtContent, customStyle, taskId) {
+  console.log(`[${taskId}] 🎨 Converting SRT to ASS with custom styles...`);
   
-  if (!srtContent || srtContent.length < 10) {
-    throw new Error('SRT content is empty or too short');
-  }
+  // Парсим SRT
+  const srtLines = srtContent.trim().split('\n');
+  const subtitles = [];
   
-  // Проверяем, что это SRT формат
-  if (!srtContent.includes('-->')) {
-    console.log(`[${taskId}] ⚠️ Invalid SRT format - converting plain text to SRT`);
-    return `1\n00:00:00,000 --> 00:00:10,000\n${srtContent.trim()}\n\n`;
-  }
-  
-  // Очищаем SRT
-  let beautifiedSrt = srtContent
-    .replace(/\r\n/g, '\n')  // Унифицируем переносы строк
-    .replace(/\r/g, '\n')
-    .trim();
-  
-  // Улучшаем форматирование текста
-  const lines = beautifiedSrt.split('\n');
-  const improvedLines = [];
-  
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    
-    if (line.includes('-->')) {
-      // Временные метки оставляем как есть
-      improvedLines.push(line);
-    } else if (/^\d+$/.test(line)) {
-      // Номера субтитров оставляем как есть
-      improvedLines.push(line);
-    } else if (line.length > 0) {
-      // Улучшаем текст субтитров
-      let improvedText = line;
+  let i = 0;
+  while (i < srtLines.length) {
+    if (/^\d+$/.test(srtLines[i].trim())) {
+      const index = parseInt(srtLines[i].trim());
+      i++;
       
-      // Убираем лишние пробелы
-      improvedText = improvedText.replace(/\s+/g, ' ').trim();
-      
-      // Исправляем пунктуацию
-      improvedText = improvedText.replace(/\s+([,.!?;:])/g, '$1');
-      improvedText = improvedText.replace(/([,.!?;:])\s*/g, '$1 ');
-      
-      // Добавляем красивые кавычки если нужно
-      improvedText = improvedText.replace(/"/g, '«').replace(/"/g, '»');
-      
-      // Если текст очень длинный, добавляем переносы в естественных местах
-      if (improvedText.length > 50) {
-        const words = improvedText.split(' ');
-        if (words.length > 8) {
-          const mid = Math.ceil(words.length / 2);
-          // Ищем хорошее место для переноса (после запятой, точки и т.д.)
-          let splitPoint = mid;
-          for (let j = mid - 2; j <= mid + 2 && j < words.length; j++) {
-            if (j > 0 && (words[j-1].endsWith(',') || words[j-1].endsWith('.') || words[j-1].endsWith('!'))) {
-              splitPoint = j;
-              break;
-            }
-          }
-          const firstLine = words.slice(0, splitPoint).join(' ');
-          const secondLine = words.slice(splitPoint).join(' ');
-          improvedText = firstLine + '\n' + secondLine;
+      if (i < srtLines.length && srtLines[i].includes('-->')) {
+        const timeLine = srtLines[i].trim();
+        const [startTime, endTime] = timeLine.split(' --> ');
+        i++;
+        
+        // Собираем текст субтитра
+        let text = '';
+        while (i < srtLines.length && srtLines[i].trim() !== '') {
+          if (text) text += '\\N'; // ASS line break
+          text += srtLines[i].trim();
+          i++;
+        }
+        
+        if (text) {
+          subtitles.push({
+            index,
+            start: convertTimeToASS(startTime),
+            end: convertTimeToASS(endTime),
+            text: text
+          });
         }
       }
-      
-      improvedLines.push(improvedText);
-    } else {
-      // Пустые строки
-      improvedLines.push('');
     }
+    i++;
   }
   
-  beautifiedSrt = improvedLines.join('\n');
+  console.log(`[${taskId}] 🎨 Parsed ${subtitles.length} subtitles from SRT`);
   
-  // Убеждаемся, что SRT заканчивается правильно
-  if (!beautifiedSrt.endsWith('\n\n')) {
-    beautifiedSrt += '\n\n';
-  }
+  // Создаем ASS файл с кастомным стилем
+  const assContent = generateASSContent(subtitles, customStyle, taskId);
   
-  console.log(`[${taskId}] ✅ SRT beautification complete`);
+  console.log(`[${taskId}] 🎨 Generated ASS content (${assContent.length} chars)`);
   
-  return beautifiedSrt;
+  return assContent;
+}
+
+// Конвертация времени из SRT формата в ASS
+function convertTimeToASS(srtTime) {
+  // SRT: 00:00:01,500 -> ASS: 0:00:01.50
+  return srtTime.replace(',', '.').replace(/^0/, '');
+}
+
+// Генерация ASS контента с кастомными стилями
+function generateASSContent(subtitles, customStyle, taskId) {
+  console.log(`[${taskId}] 🎨 Generating ASS with style:`, customStyle);
+  
+  // ASS заголовок
+  let ass = `[Script Info]
+Title: Custom Subtitles
+ScriptType: v4.00+
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,${customStyle.fontname || 'DejaVu Sans'},${customStyle.fontsize},${customStyle.fontcolor ? '&H' + customStyle.fontcolor.toUpperCase() : '&HFFFFFF'},&H000000,${customStyle.outline > 0 ? '&H000000' : '&H000000'},${customStyle.backcolour || '&H000000'},${customStyle.bold || 0},0,0,0,100,100,0,0,1,${customStyle.outline || 0},${customStyle.shadow || 0},${customStyle.alignment || 2},10,10,${customStyle.marginv || 15},1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+`;
+
+  // Добавляем субтитры
+  subtitles.forEach(sub => {
+    ass += `Dialogue: 0,${sub.start},${sub.end},Default,,0,0,0,,${sub.text}\n`;
+  });
+  
+  console.log(`[${taskId}] 🎨 ASS Style line:`);
+  const styleLine = `Style: Default,${customStyle.fontname || 'DejaVu Sans'},${customStyle.fontsize},${customStyle.fontcolor ? '&H' + customStyle.fontcolor.toUpperCase() : '&HFFFFFF'},&H000000,${customStyle.outline > 0 ? '&H000000' : '&H000000'},${customStyle.backcolour || '&H000000'},${customStyle.bold || 0},0,0,0,100,100,0,0,1,${customStyle.outline || 0},${customStyle.shadow || 0},${customStyle.alignment || 2},10,10,${customStyle.marginv || 15},1`;
+  console.log(`[${taskId}] 🎨 ${styleLine}`);
+  
+  return ass;
 }
 
 // 🚀 ОСНОВНОЙ STREAMING ENDPOINT С КАСТОМНЫМИ СТИЛЯМИ
@@ -625,80 +625,28 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     const optimalSettings = getQualitySettings(forceQuality, videoQuality);
     console.log(`[${taskId}] ⚙️ Quality settings:`, optimalSettings);
 
-    // Beautify SRT
-    const beautifiedSRT = beautifySRT(rawSrtContent, taskId);
-    fs.writeFileSync(srtPath, beautifiedSRT, 'utf8');
+    // 🎨 КОНВЕРТИРУЕМ SRT В ASS С КАСТОМНЫМИ СТИЛЯМИ
+    const assContent = convertSRTtoASS(rawSrtContent, selectedStyle, taskId);
+    const assPath = path.join(tempDir, `stream_subtitles_${taskId}.ass`);
+    fs.writeFileSync(assPath, assContent, 'utf8');
+    console.log(`[${taskId}] 🎨 ASS file saved: ${assPath}`);
 
-    // 🎨 СТРОИМ STYLE STRING ДЛЯ FFMPEG
-    const buildStyleString = (style) => {
-      let styleStr = `Fontsize=${style.fontsize}`;
-      console.log(`[${taskId}] 🎨 Building FFmpeg style string...`);
-      console.log(`[${taskId}] 🎨 Input style object:`, style);
-      
-      if (style.fontname) {
-        styleStr += `,Fontname=${style.fontname}`;
-        console.log(`[${taskId}] 🎨 Added fontname: ${style.fontname}`);
-      }
-      
-      if (style.fontcolor) {
-        const color = style.fontcolor.startsWith('&H') ? style.fontcolor : `&H${style.fontcolor}`;
-        styleStr += `,PrimaryColour=${color}`;
-        console.log(`[${taskId}] 🎨 Added fontcolor: ${color}`);
-      }
-      
-      if (style.outline && style.outline > 0) {
-        styleStr += `,OutlineColour=&H000000,Outline=${style.outline}`;
-        console.log(`[${taskId}] 🎨 Added outline: ${style.outline}`);
-      }
-      
-      if (style.shadow && style.shadow > 0) {
-        styleStr += `,Shadow=${style.shadow}`;
-        console.log(`[${taskId}] 🎨 Added shadow: ${style.shadow}`);
-      }
-      
-      if (style.bold) {
-        styleStr += `,Bold=${style.bold}`;
-        console.log(`[${taskId}] 🎨 Added bold: ${style.bold}`);
-      }
-      
-      if (style.alignment) {
-        styleStr += `,Alignment=${style.alignment}`;
-        console.log(`[${taskId}] 🎨 Added alignment: ${style.alignment}`);
-      }
-      
-      if (style.marginv !== undefined) {
-        styleStr += `,MarginV=${style.marginv}`;
-        console.log(`[${taskId}] 🎨 Added marginv: ${style.marginv}`);
-      }
-      
-      if (style.backcolour) {
-        styleStr += `,BackColour=${style.backcolour}`;
-        console.log(`[${taskId}] 🎨 ✅ Added backcolour: ${style.backcolour}`);
-      } else {
-        console.log(`[${taskId}] 🎨 ❌ No backcolour in style object`);
-      }
-      
-      console.log(`[${taskId}] 🎨 Final FFmpeg style string: ${styleStr}`);
-      return styleStr;
-    };
-
-    const styleString = buildStyleString(selectedStyle);
-    console.log(`[${taskId}] 🎨 FFmpeg style string: ${styleString}`);
-
-    // Строим FFmpeg команды с fallback логикой
-    const mainCommand = `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${styleString}'" -c:a copy -c:v libx264 -preset ${optimalSettings.preset} -crf ${optimalSettings.crf} -pix_fmt yuv420p${optimalSettings.tune ? ` -tune ${optimalSettings.tune}` : ''} -profile:v ${optimalSettings.profile}${optimalSettings.level ? ` -level ${optimalSettings.level}` : ''} -movflags +faststart -y "${outputVideoPath}"`;
-
-    // Создаем fallback команды с упрощенными стилями
-    const simplifiedStyleString = `Fontname=DejaVu Sans,Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${selectedStyle.outline || 2}`;
-    
+    // 🎨 СТРОИМ УПРОЩЕННУЮ FFMPEG КОМАНДУ ДЛЯ ASS
     const commands = [
-      mainCommand,
-      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${styleString}'" -c:a copy -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -movflags +faststart -y "${outputVideoPath}"`,
-      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${simplifiedStyleString}'" -c:a copy -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -y "${outputVideoPath}"`,
+      // Команда 1: Используем ASS файл напрямую (должно работать с фоном)
+      `ffmpeg -i "${inputVideoPath}" -vf "ass='${assPath}'" -c:a copy -c:v libx264 -preset ${optimalSettings.preset} -crf ${optimalSettings.crf} -pix_fmt yuv420p${optimalSettings.tune ? ` -tune ${optimalSettings.tune}` : ''} -profile:v ${optimalSettings.profile}${optimalSettings.level ? ` -level ${optimalSettings.level}` : ''} -movflags +faststart -y "${outputVideoPath}"`,
+      
+      // Команда 2: Fallback с medium качеством
+      `ffmpeg -i "${inputVideoPath}" -vf "ass='${assPath}'" -c:a copy -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -movflags +faststart -y "${outputVideoPath}"`,
+      
+      // Команда 3: Используем subtitles фильтр с ASS
+      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${assPath}'" -c:a copy -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -y "${outputVideoPath}"`,
+      
+      // Команда 4: Fallback к старому SRT методу
       `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}'" -c:a copy -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -y "${outputVideoPath}"`
     ];
 
-    console.log(`[${taskId}] 🔧 FULL FFMPEG COMMANDS TO TRY:`);
+    console.log(`[${taskId}] 🔧 FFMPEG COMMANDS WITH ASS FORMAT:`);
     commands.forEach((cmd, index) => {
       console.log(`[${taskId}] Command ${index + 1}: ${cmd}`);
     });
@@ -793,7 +741,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     console.log(`[${taskId}] Quality mode: ${optimalSettings.description}`);
 
     // Очистка временных файлов
-    [inputVideoPath, srtPath, outputVideoPath].forEach(filePath => {
+    [inputVideoPath, srtPath, assPath, outputVideoPath].forEach(filePath => {
       try {
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath);
@@ -859,6 +807,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     const tempFiles = [
       `/tmp/processing/stream_input_${taskId}.mp4`,
       `/tmp/processing/stream_subtitles_${taskId}.srt`,
+      `/tmp/processing/stream_subtitles_${taskId}.ass`,
       `/tmp/processing/stream_output_${taskId}.mp4`
     ];
     
