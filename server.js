@@ -705,12 +705,12 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
       .trim();
     fs.writeFileSync(srtPath, srtContent, 'utf8');
 
-    // 🎨 СТРОИМ КОМАНДЫ С DRAWTEXT ДЛЯ СОЗДАНИЯ ФОНА (ГАРАНТИРОВАННО РАБОТАЕТ)
+    // 🎨 СТРОИМ КОМАНДЫ С DRAWTEXT ДЛЯ СОЗДАНИЯ ФОНА (ОДИН ТЕКСТ С ФОНОМ)
     const commands = [];
     
-    // Если есть фон - используем drawtext + subtitles
+    // Если есть фон - используем ТОЛЬКО drawtext (без subtitles поверх)
     if (selectedStyle.backcolour) {
-      console.log(`[${taskId}] 🎨 Creating background using drawtext method`);
+      console.log(`[${taskId}] 🎨 Creating single text with background using drawtext`);
       
       // Конвертируем backcolour в RGB для drawtext
       let rgbColor = 'red'; // default
@@ -730,59 +730,51 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
       
       console.log(`[${taskId}] 🎨 Using drawtext background color: ${rgbColor}`);
       
-      // Строим style string для обычных субтитров (без фона)
-      const buildStyleString = (style) => {
-        let styleStr = `Fontsize=${style.fontsize}`;
-        if (style.fontname) styleStr += `,Fontname=${style.fontname}`;
-        if (style.fontcolor) {
-          const color = style.fontcolor.startsWith('&H') ? style.fontcolor : `&H${style.fontcolor}`;
-          styleStr += `,PrimaryColour=${color}`;
+      // Читаем SRT для извлечения текста
+      const srtContent = fs.readFileSync(srtPath, 'utf8');
+      let subtitleText = 'Текст субтитра';
+      
+      // Простое извлечение текста из SRT
+      const srtLines = srtContent.split('\n');
+      for (let line of srtLines) {
+        const trimmed = line.trim();
+        if (trimmed && !trimmed.includes('-->') && !/^\d+$/.test(trimmed)) {
+          subtitleText = trimmed;
+          break;
         }
-        if (style.outline) styleStr += `,OutlineColour=&H000000,Outline=${style.outline}`;
-        if (style.shadow) styleStr += `,Shadow=${style.shadow}`;
-        if (style.bold) styleStr += `,Bold=${style.bold}`;
-        if (style.alignment) styleStr += `,Alignment=${style.alignment}`;
-        if (style.marginv) styleStr += `,MarginV=${style.marginv}`;
-        // НЕ добавляем BackColour - его заменит drawtext
-        return styleStr;
-      };
+      }
       
-      const styleString = buildStyleString(selectedStyle);
-      console.log(`[${taskId}] 🎨 Style string (without background): ${styleString}`);
+      console.log(`[${taskId}] 🎨 Extracted subtitle text: "${subtitleText}"`);
       
-      // Команда с drawtext фоном + субтитрами поверх
+      // Команда 1: Один drawtext с фоном (позиция снизу)
       commands.push(
-        `ffmpeg -i "${inputVideoPath}" -vf "drawtext=textfile='${srtPath}':fontcolor=white:fontsize=${selectedStyle.fontsize * 2}:box=1:boxcolor=${rgbColor}@0.8:boxborderw=5:x=(w-text_w)/2:y=h-text_h-30,subtitles='${srtPath}':force_style='${styleString}'" -c:a copy -c:v libx264 -preset ${optimalSettings.preset} -crf ${optimalSettings.crf} -pix_fmt yuv420p${optimalSettings.tune ? ` -tune ${optimalSettings.tune}` : ''} -profile:v ${optimalSettings.profile}${optimalSettings.level ? ` -level ${optimalSettings.level}` : ''} -movflags +faststart -y "${outputVideoPath}"`
+        `ffmpeg -i "${inputVideoPath}" -vf "drawtext=text='${subtitleText}':fontcolor=white:fontsize=${selectedStyle.fontsize * 3}:box=1:boxcolor=${rgbColor}@0.8:boxborderw=8:x=(w-text_w)/2:y=h-text_h-30" -c:a copy -c:v libx264 -preset ${optimalSettings.preset} -crf ${optimalSettings.crf} -pix_fmt yuv420p${optimalSettings.tune ? ` -tune ${optimalSettings.tune}` : ''} -profile:v ${optimalSettings.profile}${optimalSettings.level ? ` -level ${optimalSettings.level}` : ''} -movflags +faststart -y "${outputVideoPath}"`
       );
       
-      // Простая команда с drawtext фоном
+      // Команда 2: Один drawtext с фоном (центр экрана для лучшей видимости)
       commands.push(
-        `ffmpeg -i "${inputVideoPath}" -vf "drawtext=text='ТЕКСТ С ФОНОМ':fontcolor=white:fontsize=24:box=1:boxcolor=${rgbColor}@0.8:boxborderw=8:x=(w-text_w)/2:y=h-text_h-50" -c:a copy -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -movflags +faststart -y "${outputVideoPath}"`
+        `ffmpeg -i "${inputVideoPath}" -vf "drawtext=text='${subtitleText}':fontcolor=white:fontsize=${selectedStyle.fontsize * 4}:box=1:boxcolor=${rgbColor}@0.9:boxborderw=12:x=(w-text_w)/2:y=(h-text_h)/2" -c:a copy -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -movflags +faststart -y "${outputVideoPath}"`
+      );
+      
+      // Команда 3: Тест с фиксированным текстом для отладки
+      commands.push(
+        `ffmpeg -i "${inputVideoPath}" -vf "drawtext=text='ТЕСТ ФОНА':fontcolor=white:fontsize=32:box=1:boxcolor=${rgbColor}@1.0:boxborderw=10:x=(w-text_w)/2:y=h-100" -c:a copy -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -y "${outputVideoPath}"`
       );
       
     } else {
-      console.log(`[${taskId}] 🎨 No background - using regular ASS method`);
+      console.log(`[${taskId}] 🎨 No background - using regular subtitles`);
     }
     
-    // Добавляем fallback команды
+    // Добавляем fallback команды без фона
     commands.push(
       // ASS файл напрямую
       `ffmpeg -i "${inputVideoPath}" -vf "ass='${assPath}'" -c:a copy -c:v libx264 -preset ${optimalSettings.preset} -crf ${optimalSettings.crf} -pix_fmt yuv420p${optimalSettings.tune ? ` -tune ${optimalSettings.tune}` : ''} -profile:v ${optimalSettings.profile}${optimalSettings.level ? ` -level ${optimalSettings.level}` : ''} -movflags +faststart -y "${outputVideoPath}"`,
       
-      // Fallback с medium качеством
-      `ffmpeg -i "${inputVideoPath}" -vf "ass='${assPath}'" -c:a copy -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -movflags +faststart -y "${outputVideoPath}"`,
-      
-      // Используем subtitles фильтр с ASS
-      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${assPath}'" -c:a copy -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -y "${outputVideoPath}"`,
-      
-      // Тест с drawtext для проверки
-      `ffmpeg -i "${inputVideoPath}" -vf "drawtext=text='ТЕСТ КРАСНОГО ФОНА':fontcolor=white:fontsize=24:box=1:boxcolor=red@1.0:boxborderw=5:x=(w-text_w)/2:y=(h-text_h)/2" -c:a copy -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -y "${outputVideoPath}"`,
-      
-      // Fallback к старому SRT методу
+      // Fallback с subtitles фильтром
       `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}'" -c:a copy -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -y "${outputVideoPath}"`
     );
 
-    console.log(`[${taskId}] 🔧 FFMPEG COMMANDS WITH DRAWTEXT BACKGROUND:`);
+    console.log(`[${taskId}] 🔧 FFMPEG COMMANDS WITH SINGLE TEXT + BACKGROUND:`);
     commands.forEach((cmd, index) => {
       console.log(`[${taskId}] Command ${index + 1}: ${cmd}`);
     });
