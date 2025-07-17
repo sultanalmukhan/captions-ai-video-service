@@ -698,23 +698,33 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
       `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}'" -c:a copy -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -y "${outputVideoPath}"`
     ];
 
+    console.log(`[${taskId}] 🔧 FULL FFMPEG COMMANDS TO TRY:`);
+    commands.forEach((cmd, index) => {
+      console.log(`[${taskId}] Command ${index + 1}: ${cmd}`);
+    });
+
     let success = false;
     let usedCommand = 0;
+    let lastError = null;
 
     // Выполняем команды ПОСЛЕДОВАТЕЛЬНО
     for (let i = 0; i < commands.length && !success; i++) {
       try {
         console.log(`[${taskId}] 🎨 Trying custom style method ${i + 1}...`);
+        console.log(`[${taskId}] 🔧 Executing: ${commands[i]}`);
         
         if (fs.existsSync(outputVideoPath)) fs.unlinkSync(outputVideoPath);
         
         const cmdStartTime = Date.now();
-        execSync(commands[i], { 
+        const result = execSync(commands[i], { 
           stdio: 'pipe',
           timeout: 600000,
-          maxBuffer: 1024 * 1024 * 200
+          maxBuffer: 1024 * 1024 * 200,
+          encoding: 'utf8'
         });
         const cmdDuration = Date.now() - cmdStartTime;
+        
+        console.log(`[${taskId}] 🔧 FFmpeg output: ${result}`);
         
         if (fs.existsSync(outputVideoPath)) {
           const outputSize = fs.statSync(outputVideoPath).size;
@@ -728,6 +738,8 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
         }
       } catch (error) {
         console.log(`[${taskId}] ❌ Custom style method ${i + 1} failed:`, error.message);
+        console.log(`[${taskId}] 🔧 FFmpeg stderr: ${error.stderr || 'No stderr'}`);
+        lastError = error;
       }
     }
 
