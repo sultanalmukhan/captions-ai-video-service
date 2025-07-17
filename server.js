@@ -94,13 +94,17 @@ function buildCustomStyle(styleParams) {
   // Валидация параметров
   params.fontsize = Math.max(6, Math.min(12, parseInt(params.fontsize) || 8));
   params.fontcolor = (params.fontcolor || 'ffffff').replace('#', '').toLowerCase();
-  params.bold = Boolean(params.bold);
-  params.outline = Boolean(params.outline);
-  params.background = Boolean(params.background);
+  
+  // ✅ ИСПРАВЛЕНИЕ: Правильная обработка boolean параметров из строк
+  params.bold = parseBooleanParam(params.bold);
+  params.outline = parseBooleanParam(params.outline);
+  params.background = parseBooleanParam(params.background);
   
   if (!['bottom', 'top', 'center'].includes(params.position)) {
     params.position = 'bottom';
   }
+  
+  console.log(`[DEBUG] Parsed boolean params: bold=${params.bold}, outline=${params.outline}, background=${params.background}`);
   
   // Применяем позицию
   const positionSettings = SUBTITLE_POSITIONS[params.position];
@@ -120,20 +124,40 @@ function buildCustomStyle(styleParams) {
   if (params.outline) {
     style.outline = 2;  // Фиксированная толщина 2px
     style.shadow = 1;   // Легкая тень для лучшей читаемости
+    console.log(`[DEBUG] Added outline: 2px with shadow`);
   } else {
     style.outline = 0;
     style.shadow = 0;
+    console.log(`[DEBUG] Outline disabled`);
   }
   
   // Добавляем фон если включен
   if (params.background) {
     style.backcolour = '&H80000000';  // Черный с 50% прозрачностью
+    console.log(`[DEBUG] Added background: black 50% transparent`);
+  } else {
+    console.log(`[DEBUG] Background disabled`);
   }
   
   return {
     style,
-    description: `Custom style: ${params.fontsize}px, ${params.fontcolor}, ${params.position}, outline: ${params.outline}, bg: ${params.background}`
+    description: `Custom style: ${params.fontsize}px, ${params.fontcolor}, ${params.position}, outline: ${params.outline}, bg: ${params.background}, bold: ${params.bold}`
   };
+}
+
+// 🔧 HELPER ФУНКЦИЯ ДЛЯ ПАРСИНГА BOOLEAN ПАРАМЕТРОВ
+function parseBooleanParam(value) {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const lowercased = value.toLowerCase().trim();
+    return lowercased === 'true' || lowercased === '1' || lowercased === 'yes';
+  }
+  if (typeof value === 'number') {
+    return value !== 0;
+  }
+  return false;
 }
 
 // 🎯 ФУНКЦИЯ АНАЛИЗА КАЧЕСТВА ИСХОДНОГО ВИДЕО
