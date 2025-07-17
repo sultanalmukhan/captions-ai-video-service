@@ -1,5 +1,5 @@
-// Beautiful Railway Service с готовыми стилями для соц.сетей + МАКСИМАЛЬНОЕ КАЧЕСТВО + STREAMING
-// server.js - готовые шаблоны стилей TikTok/Instagram + NO COMPRESSION + NO TIMEOUT
+// Beautiful Railway Service с кастомными стилями + МАКСИМАЛЬНОЕ КАЧЕСТВО + STREAMING
+// server.js - Custom subtitle styles + NO COMPRESSION + NO TIMEOUT
 
 const express = require('express');
 const multer = require('multer');
@@ -47,218 +47,94 @@ const upload = multer({
   }
 });
 
-// 🎨 ГОТОВЫЕ СТИЛИ ДЛЯ СОЦИАЛЬНЫХ СЕТЕЙ (КОМПАКТНЫЕ РАЗМЕРЫ + УМНЫЕ FALLBACK ШРИФТЫ)
-const SUBTITLE_STYLES = {
-  // TikTok стили  
-  tiktok_classic: {
-    fontsize: 8,  // 16/2 = 8
-    fontcolor: 'white',
-    fontname: 'DejaVu Sans',
-    fontnames: ['Ubuntu', 'Liberation Sans', 'DejaVu Sans'],
-    outline: 2,   // Уменьшили обводку
-    shadow: 1,    // Уменьшили тень
-    bold: 1,
-    alignment: 2,
-    marginv: 15,  // Уменьшили отступ
-    backcolour: '&H80000000',
-    name: 'TikTok Classic',
-    description: 'Классический TikTok - белый жирный текст с черным фоном'
-  },
-  
-  tiktok_neon: {
-    fontsize: 9,  // 18/2 = 9
-    fontcolor: '00ffff',
-    fontname: 'Liberation Sans',
-    fontnames: ['Roboto', 'Liberation Sans', 'Noto Sans'],
-    outline: 2,
-    shadow: 1,
-    bold: 1,
-    alignment: 2,
-    marginv: 13,  // 25/2 ≈ 13
-    name: 'TikTok Neon',
-    description: 'Неоновый TikTok стиль - яркий голубой с сильной обводкой'
-  },
-  
-  tiktok_yellow: {
-    fontsize: 9,  // 17/2 ≈ 9
-    fontcolor: 'ffff00',
-    fontname: 'Ubuntu',
-    fontnames: ['Ubuntu', 'Open Sans', 'DejaVu Sans'],
-    outline: 2,
-    shadow: 1,
-    bold: 1,
-    alignment: 2,
-    marginv: 15,
-    name: 'TikTok Yellow',
-    description: 'Желтый TikTok стиль - как у популярных блогеров'
-  },
-  
-  // Instagram стили
-  instagram_clean: {
-    fontsize: 8,  // 15/2 ≈ 8
-    fontcolor: 'ffffff',
-    fontname: 'Noto Sans',
-    fontnames: ['Noto Sans', 'Open Sans', 'Liberation Sans'],
-    outline: 1,
-    shadow: 1,
-    alignment: 2,
-    marginv: 18,  // 35/2 ≈ 18
-    backcolour: '&H40000000',
-    name: 'Instagram Clean',
-    description: 'Чистый Instagram стиль - элегантный белый текст'
-  },
-  
-  instagram_story: {
-    fontsize: 7,  // 14/2 = 7
-    fontcolor: 'ffffff',
-    fontname: 'Roboto',
-    fontnames: ['Roboto', 'Noto Sans', 'DejaVu Sans'],
-    outline: 1,
-    shadow: 1,
-    alignment: 2,
-    marginv: 20,  // 40/2 = 20
-    name: 'Instagram Story',
-    description: 'Стиль Instagram Stories - тонкий и изящный'
-  },
-  
-  instagram_reel: {
-    fontsize: 8,  // 16/2 = 8
-    fontcolor: 'ffffff',
-    fontname: 'Open Sans',
-    fontnames: ['Open Sans', 'Liberation Sans', 'DejaVu Sans'],
-    outline: 2,
-    shadow: 1,
-    bold: 1,
-    alignment: 2,
-    marginv: 15,
-    backcolour: '&H60000000',
-    name: 'Instagram Reel',
-    description: 'Стиль Instagram Reels - жирный и контрастный'
-  },
-  
-  // YouTube стили
-  youtube_classic: {
-    fontsize: 7,  // 14/2 = 7
-    fontcolor: 'ffffff',
-    fontname: 'Liberation Sans',
-    fontnames: ['Source Sans Pro', 'Liberation Sans', 'Noto Sans'],
-    outline: 1,
-    shadow: 1,
-    alignment: 2,
-    marginv: 13,  // 25/2 ≈ 13
-    name: 'YouTube Classic',
-    description: 'Классический YouTube - стандартные субтитры'
-  },
-  
-  youtube_gaming: {
-    fontsize: 8,  // 15/2 ≈ 8
-    fontcolor: '00ff00',
-    fontname: 'DejaVu Sans',
-    fontnames: ['Ubuntu', 'DejaVu Sans', 'Liberation Sans'],
-    outline: 1,
-    shadow: 1,
-    bold: 1,
-    alignment: 2,
-    marginv: 14,
-    name: 'YouTube Gaming',
-    description: 'Игровой стиль YouTube - зеленый геймерский'
-  },
-  
-  // Современные трендовые стили
-  modern_gradient: {
-    fontsize: 9,  // 17/2 ≈ 9
-    fontcolor: 'ff69b4',
-    fontname: 'Open Sans',
-    fontnames: ['Montserrat', 'Open Sans', 'Liberation Sans'],
-    outline: 2,
-    shadow: 1,
-    bold: 1,
-    alignment: 2,
-    marginv: 15,
-    name: 'Modern Pink',
-    description: 'Модерн розовый - трендовый цвет 2024'
-  },
-  
-  retro_vhs: {
-    fontsize: 8,  // 16/2 = 8
-    fontcolor: 'ff00ff',
-    fontname: 'DejaVu Sans',
-    fontnames: ['Ubuntu', 'DejaVu Sans', 'Liberation Sans'],
-    outline: 1,
-    shadow: 1,
-    bold: 1,
-    alignment: 2,
-    marginv: 14,
-    name: 'Retro VHS',
-    description: 'Ретро VHS стиль - фиолетовый винтаж'
-  },
-  
-  minimal_black: {
-    fontsize: 7,  // 13/2 ≈ 7
-    fontcolor: '000000',
-    fontname: 'Noto Sans',
-    fontnames: ['Roboto', 'Noto Sans', 'Liberation Sans'],
-    outline: 0,
-    shadow: 0,
-    alignment: 2,
-    marginv: 10,
-    backcolour: '&H80ffffff',
-    name: 'Minimal Black',
-    description: 'Минималистичный - черный текст на белом фоне'
-  },
-  
-  // Премиум стили
-  luxury_gold: {
-    fontsize: 9,  // 18/2 = 9
-    fontcolor: 'ffd700',
-    fontname: 'DejaVu Sans',
-    fontnames: ['Ubuntu', 'DejaVu Sans', 'Liberation Sans'],
-    outline: 2,
-    shadow: 1,
-    bold: 1,
-    alignment: 2,
-    marginv: 16,
-    backcolour: '&H80000000',
-    name: 'Luxury Gold',
-    description: 'Премиум золотой - роскошный стиль'
-  },
-  
-  neon_purple: {
-    fontsize: 9,  // 17/2 ≈ 9
-    fontcolor: '9400d3',
-    fontname: 'Liberation Sans',
-    fontnames: ['Open Sans', 'Liberation Sans', 'Noto Sans'],
-    outline: 2,
-    shadow: 1,
-    bold: 1,
-    alignment: 2,
-    marginv: 15,
-    name: 'Neon Purple',
-    description: 'Неоновый фиолетовый - киберпанк стиль'
-  }
-};
-
 // 📍 ПОЗИЦИИ СУБТИТРОВ
 const SUBTITLE_POSITIONS = {
   bottom: {
-    alignment: 2,     // По центру
+    alignment: 2,     // По центру внизу
     marginv: 15,      // Отступ снизу
-    name: 'Снизу',
-    description: 'Субтитры внизу экрана (стандарт)'
+    name: 'Снизу'
   },
   top: {
     alignment: 8,     // По центру вверху  
     marginv: 15,      // Отступ сверху
-    name: 'Сверху',
-    description: 'Субтитры вверху экрана'
+    name: 'Сверху'
   },
   center: {
     alignment: 5,     // По центру экрана
     marginv: 0,       // Без отступов
-    name: 'По центру',
-    description: 'Субтитры в центре экрана'
+    name: 'По центру'
   }
 };
+
+// 🎯 ДОСТУПНЫЕ ШРИФТЫ (с fallback)
+const AVAILABLE_FONTS = [
+  'DejaVu Sans',
+  'Ubuntu', 
+  'Liberation Sans',
+  'Noto Sans',
+  'Roboto',
+  'Open Sans'
+];
+
+// 🎨 ФУНКЦИЯ СОЗДАНИЯ СТИЛЯ ИЗ ПАРАМЕТРОВ
+function buildCustomStyle(styleParams) {
+  // Значения по умолчанию
+  const defaults = {
+    fontsize: 8,
+    fontcolor: 'ffffff',
+    bold: false,
+    outline: true,
+    position: 'bottom',
+    background: false
+  };
+  
+  // Объединяем с пользовательскими параметрами
+  const params = { ...defaults, ...styleParams };
+  
+  // Валидация параметров
+  params.fontsize = Math.max(6, Math.min(12, parseInt(params.fontsize) || 8));
+  params.fontcolor = (params.fontcolor || 'ffffff').replace('#', '').toLowerCase();
+  params.bold = Boolean(params.bold);
+  params.outline = Boolean(params.outline);
+  params.background = Boolean(params.background);
+  
+  if (!['bottom', 'top', 'center'].includes(params.position)) {
+    params.position = 'bottom';
+  }
+  
+  // Применяем позицию
+  const positionSettings = SUBTITLE_POSITIONS[params.position];
+  
+  // Строим финальный стиль
+  const style = {
+    fontsize: params.fontsize,
+    fontcolor: params.fontcolor,
+    fontname: AVAILABLE_FONTS[0], // Используем первый доступный шрифт
+    fontnames: AVAILABLE_FONTS,   // Список для fallback
+    bold: params.bold ? 1 : 0,
+    alignment: positionSettings.alignment,
+    marginv: positionSettings.marginv
+  };
+  
+  // Добавляем обводку если включена
+  if (params.outline) {
+    style.outline = 2;  // Фиксированная толщина 2px
+    style.shadow = 1;   // Легкая тень для лучшей читаемости
+  } else {
+    style.outline = 0;
+    style.shadow = 0;
+  }
+  
+  // Добавляем фон если включен
+  if (params.background) {
+    style.backcolour = '&H80000000';  // Черный с 50% прозрачностью
+  }
+  
+  return {
+    style,
+    description: `Custom style: ${params.fontsize}px, ${params.fontcolor}, ${params.position}, outline: ${params.outline}, bg: ${params.background}`
+  };
+}
 
 // 🎯 ФУНКЦИЯ АНАЛИЗА КАЧЕСТВА ИСХОДНОГО ВИДЕО
 function analyzeVideoQuality(inputPath) {
@@ -392,11 +268,21 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'healthy', 
     timestamp: new Date().toISOString(),
-    mode: 'MAXIMUM_QUALITY_SOCIAL_MEDIA_STYLES_WITH_STREAMING',
-    total_styles: Object.keys(SUBTITLE_STYLES).length,
+    mode: 'CUSTOM_STYLES_WITH_MAXIMUM_QUALITY_STREAMING',
+    style_system: 'CUSTOM_PARAMETERS_ONLY',
+    available_fonts: AVAILABLE_FONTS,
+    available_positions: Object.keys(SUBTITLE_POSITIONS),
     quality_mode: 'NO_COMPRESSION_MAXIMUM_QUALITY_STREAMING_ENABLED',
+    style_parameters: {
+      fontsize: 'number (6-12)',
+      fontcolor: 'string (hex without #)',
+      bold: 'boolean',
+      outline: 'boolean',
+      position: 'string (bottom/top/center)',
+      background: 'boolean'
+    },
     endpoints: [
-      '/process-video-stream (JSON response - NO TIMEOUT)',
+      '/process-video-stream (Custom styles - JSON response)',
       '/health (This endpoint)'
     ],
     ...systemInfo
@@ -419,7 +305,7 @@ function getSystemInfo() {
       ffmpeg_available: true,
       ffmpeg_version: ffmpegVersion,
       fonts_available: availableFonts,
-      subtitle_method: 'MAXIMUM_QUALITY_SOCIAL_MEDIA_STYLES_WITH_JSON_RESPONSE'
+      subtitle_method: 'CUSTOM_STYLES_WITH_JSON_RESPONSE'
     };
   } catch (error) {
     return { 
@@ -517,12 +403,12 @@ function beautifySRT(srtContent, taskId) {
   return beautifiedSrt;
 }
 
-// 🚀 ОСНОВНОЙ STREAMING ENDPOINT С VALIDATED BASE64 RESPONSE
+// 🚀 ОСНОВНОЙ STREAMING ENDPOINT С КАСТОМНЫМИ СТИЛЯМИ
 app.post('/process-video-stream', upload.single('video'), async (req, res) => {
   const taskId = req.body.task_id || uuidv4();
   const startTime = Date.now();
   
-  console.log(`\n=== [${taskId}] STREAMING QUALITY PROCESSING (VALIDATED JSON) ===`);
+  console.log(`\n=== [${taskId}] CUSTOM STYLE PROCESSING (VALIDATED JSON) ===`);
 
   try {
     // Валидация входных данных
@@ -545,37 +431,27 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     const videoBuffer = req.file.buffer;
     const rawSrtContent = req.body.srt_content;
     
-    // Получаем параметры
-    const styleId = req.body.style_id || 'tiktok_classic';
-    const position = req.body.position || 'bottom';
-    const customStyle = req.body.custom_style ? JSON.parse(req.body.custom_style) : null;
+    // 🎨 ПОЛУЧАЕМ ПАРАМЕТРЫ КАСТОМНОГО СТИЛЯ
+    const styleParams = {
+      fontsize: req.body.fontsize,
+      fontcolor: req.body.fontcolor,
+      bold: req.body.bold,
+      outline: req.body.outline,
+      position: req.body.position,
+      background: req.body.background
+    };
+    
     const forceQuality = req.body.force_quality || 'auto';
     
     console.log(`[${taskId}] Video size: ${(videoBuffer.length / 1024 / 1024).toFixed(2)}MB`);
     console.log(`[${taskId}] Raw SRT length: ${rawSrtContent.length} chars`);
-    console.log(`[${taskId}] Style: ${styleId}, Position: ${position}`);
+    console.log(`[${taskId}] 🎨 Custom style params:`, styleParams);
     console.log(`[${taskId}] 🎯 Quality mode: ${forceQuality}`);
     
-    // Выбираем стиль
-    let selectedStyle;
-    if (customStyle) {
-      selectedStyle = customStyle;
-      console.log(`[${taskId}] Using CUSTOM style`);
-    } else if (SUBTITLE_STYLES[styleId]) {
-      selectedStyle = SUBTITLE_STYLES[styleId];
-      console.log(`[${taskId}] Using predefined style: ${selectedStyle.name}`);
-    } else {
-      selectedStyle = SUBTITLE_STYLES.tiktok_classic;
-      console.log(`[${taskId}] Using default style: ${selectedStyle.name}`);
-    }
-
-    // Применяем позицию
-    if (SUBTITLE_POSITIONS[position]) {
-      const positionSettings = SUBTITLE_POSITIONS[position];
-      selectedStyle.alignment = positionSettings.alignment;
-      selectedStyle.marginv = positionSettings.marginv;
-      console.log(`[${taskId}] 📍 Applied position: ${positionSettings.name}`);
-    }
+    // 🎨 СОЗДАЕМ КАСТОМНЫЙ СТИЛЬ
+    const { style: selectedStyle, description: styleDescription } = buildCustomStyle(styleParams);
+    console.log(`[${taskId}] ✅ Built custom style: ${styleDescription}`);
+    console.log(`[${taskId}] 📋 Final style:`, selectedStyle);
 
     // Создаем временные файлы
     const tempDir = '/tmp/processing';
@@ -607,33 +483,59 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     const beautifiedSRT = beautifySRT(rawSrtContent, taskId);
     fs.writeFileSync(srtPath, beautifiedSRT, 'utf8');
 
-    // Строим style string
+    // 🎨 СТРОИМ STYLE STRING ДЛЯ FFMPEG
     const buildStyleString = (style) => {
       let styleStr = `Fontsize=${style.fontsize}`;
-      if (style.fontname) styleStr += `,Fontname=${style.fontname}`;
+      
+      if (style.fontname) {
+        styleStr += `,Fontname=${style.fontname}`;
+      }
+      
       if (style.fontcolor) {
         const color = style.fontcolor.startsWith('&H') ? style.fontcolor : `&H${style.fontcolor}`;
         styleStr += `,PrimaryColour=${color}`;
       }
-      if (style.outline) styleStr += `,OutlineColour=&H000000,Outline=${style.outline}`;
-      if (style.shadow) styleStr += `,Shadow=${style.shadow}`;
-      if (style.bold) styleStr += `,Bold=${style.bold}`;
-      if (style.alignment) styleStr += `,Alignment=${style.alignment}`;
-      if (style.marginv) styleStr += `,MarginV=${style.marginv}`;
-      if (style.backcolour) styleStr += `,BackColour=${style.backcolour}`;
+      
+      if (style.outline && style.outline > 0) {
+        styleStr += `,OutlineColour=&H000000,Outline=${style.outline}`;
+      }
+      
+      if (style.shadow && style.shadow > 0) {
+        styleStr += `,Shadow=${style.shadow}`;
+      }
+      
+      if (style.bold) {
+        styleStr += `,Bold=${style.bold}`;
+      }
+      
+      if (style.alignment) {
+        styleStr += `,Alignment=${style.alignment}`;
+      }
+      
+      if (style.marginv !== undefined) {
+        styleStr += `,MarginV=${style.marginv}`;
+      }
+      
+      if (style.backcolour) {
+        styleStr += `,BackColour=${style.backcolour}`;
+      }
+      
       return styleStr;
     };
 
     const styleString = buildStyleString(selectedStyle);
-    console.log(`[${taskId}] Style string: ${styleString}`);
+    console.log(`[${taskId}] 🎨 FFmpeg style string: ${styleString}`);
 
-    // Строим FFmpeg команду
+    // Строим FFmpeg команды с fallback логикой
     const mainCommand = `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${styleString}'" -c:a copy -c:v libx264 -preset ${optimalSettings.preset} -crf ${optimalSettings.crf} -pix_fmt yuv420p${optimalSettings.tune ? ` -tune ${optimalSettings.tune}` : ''} -profile:v ${optimalSettings.profile}${optimalSettings.level ? ` -level ${optimalSettings.level}` : ''} -movflags +faststart -y "${outputVideoPath}"`;
 
+    // Создаем fallback команды с упрощенными стилями
+    const simplifiedStyleString = `Fontname=DejaVu Sans,Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${selectedStyle.outline || 2}`;
+    
     const commands = [
       mainCommand,
       `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${styleString}'" -c:a copy -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -movflags +faststart -y "${outputVideoPath}"`,
-      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${styleString}'" -c:a copy -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -y "${outputVideoPath}"`,
+      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${simplifiedStyleString}'" -c:a copy -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -y "${outputVideoPath}"`,
       `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}'" -c:a copy -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -y "${outputVideoPath}"`
     ];
 
@@ -643,7 +545,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     // Выполняем команды ПОСЛЕДОВАТЕЛЬНО
     for (let i = 0; i < commands.length && !success; i++) {
       try {
-        console.log(`[${taskId}] 🎨 Trying streaming method ${i + 1}...`);
+        console.log(`[${taskId}] 🎨 Trying custom style method ${i + 1}...`);
         
         if (fs.existsSync(outputVideoPath)) fs.unlinkSync(outputVideoPath);
         
@@ -658,7 +560,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
         if (fs.existsSync(outputVideoPath)) {
           const outputSize = fs.statSync(outputVideoPath).size;
           if (outputSize > 0) {
-            console.log(`[${taskId}] ✅ STREAMING SUCCESS! Method ${i + 1} worked! (${cmdDuration}ms)`);
+            console.log(`[${taskId}] ✅ CUSTOM STYLE SUCCESS! Method ${i + 1} worked! (${cmdDuration}ms)`);
             console.log(`[${taskId}] Output size: ${(outputSize / 1024 / 1024).toFixed(2)}MB`);
             success = true;
             usedCommand = i + 1;
@@ -666,16 +568,16 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
           }
         }
       } catch (error) {
-        console.log(`[${taskId}] ❌ Streaming method ${i + 1} failed:`, error.message);
+        console.log(`[${taskId}] ❌ Custom style method ${i + 1} failed:`, error.message);
       }
     }
 
     if (!success) {
-      throw new Error('All streaming methods failed');
+      throw new Error('All custom style methods failed');
     }
 
     // ВАЛИДАЦИЯ И СОЗДАНИЕ ОТВЕТА
-    console.log(`[${taskId}] 🎉 STREAMING PROCESSING SUCCESS! 🚀`);
+    console.log(`[${taskId}] 🎉 CUSTOM STYLE PROCESSING SUCCESS! 🚀`);
     
     // Проверяем что файл существует и имеет правильный размер
     if (!fs.existsSync(outputVideoPath)) {
@@ -736,7 +638,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
       }
     });
 
-    // Создаем ответ с дополнительными метаданными для валидации
+    // Создаем ответ с метаданными кастомного стиля
     const responseData = {
       success: true,
       task_id: taskId,
@@ -745,7 +647,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
         input_size_bytes: videoBuffer.length,
         output_size_bytes: processedVideoBuffer.length,
         size_change_percent: parseFloat(sizeChange.toFixed(1)),
-        method_used: `STREAMING_METHOD_${usedCommand}`,
+        method_used: `CUSTOM_STYLE_METHOD_${usedCommand}`,
         quality_mode: forceQuality,
         quality_description: optimalSettings.description
       },
@@ -762,13 +664,12 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
         encoding: 'base64'
       },
       style_info: {
-        style_id: customStyle ? 'custom' : styleId,
-        style_name_safe: customStyle ? 'Custom_Style' : styleId.replace(/_/g, '-'),
-        position: position,
-        fontsize: selectedStyle.fontsize,
-        fontcolor: selectedStyle.fontcolor,
-        has_background: !!selectedStyle.backcolour,
-        has_bold: !!selectedStyle.bold
+        type: 'custom',
+        description: styleDescription,
+        parameters: styleParams,
+        final_style: selectedStyle,
+        ffmpeg_style_string: styleString,
+        position_name: SUBTITLE_POSITIONS[styleParams.position || 'bottom'].name
       },
       quality_info: {
         input_resolution: videoQuality.resolution,
@@ -781,13 +682,13 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
       }
     };
 
-    console.log(`[${taskId}] 📤 Sending JSON response with validated video data...`);
+    console.log(`[${taskId}] 📤 Sending JSON response with custom styled video data...`);
 
     // Отправляем ответ
     res.json(responseData);
 
   } catch (error) {
-    console.error(`[${taskId}] 💥 STREAMING ERROR:`, error.message);
+    console.error(`[${taskId}] 💥 CUSTOM STYLE ERROR:`, error.message);
 
     // Очистка при ошибке
     const tempFiles = [
@@ -813,9 +714,16 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
 
 // Настройки для сервера
 const server = app.listen(PORT, () => {
-  console.log(`🎨 MAXIMUM QUALITY SOCIAL MEDIA Subtitle Service running on port ${PORT} 🎨`);
-  console.log(`📱 Ready for TikTok, Instagram, YouTube styles with CRYSTAL CLEAR quality!`);
-  console.log(`🎬 Total available styles: ${Object.keys(SUBTITLE_STYLES).length}`);
+  console.log(`🎨 CUSTOM STYLE Subtitle Service running on port ${PORT} 🎨`);
+  console.log(`📱 Ready for custom subtitle styles with MAXIMUM QUALITY!`);
+  console.log(`🎯 Style system: CUSTOM_PARAMETERS_ONLY`);
+  console.log(`✨ Available parameters:`);
+  console.log(`   • fontsize (6-12) - Text size`);
+  console.log(`   • fontcolor (hex) - Text color`);
+  console.log(`   • bold (true/false) - Bold text`);
+  console.log(`   • outline (true/false) - Text outline`);
+  console.log(`   • position (bottom/top/center) - Text position`);
+  console.log(`   • background (true/false) - Black transparent background`);
   console.log(`🎯 Quality modes available:`);
   console.log(`   • auto - Adaptive quality based on input analysis`);
   console.log(`   • lossless - Perfect quality preservation (CRF 0)`);
@@ -824,11 +732,11 @@ const server = app.listen(PORT, () => {
   console.log(`   • medium - Medium quality (CRF 18)`);
   console.log(`   • low - Low quality for testing (CRF 28)`);
   console.log(`🚀 Endpoints available:`);
-  console.log(`   • POST /process-video-stream (Main endpoint - Validated JSON)`);
+  console.log(`   • POST /process-video-stream (Custom styles - Validated JSON)`);
   console.log(`   • GET /health (System status)`);
   const systemInfo = getSystemInfo();
   console.log(`FFmpeg: ${systemInfo.ffmpeg_available}`);
-  console.log(`Quality Mode: VALIDATED_JSON_RESPONSE_WITH_MP4_VERIFICATION`);
+  console.log(`Quality Mode: CUSTOM_STYLES_WITH_MP4_VERIFICATION`);
 });
 
 // Увеличиваем timeout сервера
