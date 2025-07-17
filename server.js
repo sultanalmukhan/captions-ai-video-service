@@ -692,6 +692,11 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     const assPath = path.join(tempDir, `stream_subtitles_${taskId}.ass`);
     fs.writeFileSync(assPath, assContent, 'utf8');
     console.log(`[${taskId}] 🎨 ASS file saved: ${assPath}`);
+    
+    // 🔍 ДЕБАГ: Выводим содержимое ASS файла для проверки
+    console.log(`[${taskId}] 🔍 ASS FILE CONTENT:`);
+    console.log(assContent);
+    console.log(`[${taskId}] 🔍 END OF ASS FILE`);
 
     // 🎨 СОЗДАЕМ FALLBACK SRT НА СЛУЧАЙ ПРОБЛЕМ С ASS
     const srtContent = rawSrtContent
@@ -702,22 +707,19 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
 
     // 🎨 СТРОИМ УПРОЩЕННУЮ FFMPEG КОМАНДУ ДЛЯ ASS
     const commands = [
-      // Команда 1: Тест с явной загрузкой libass
-      `ffmpeg -i "${inputVideoPath}" -vf "ass='${assPath}':force_style='BorderStyle=3'" -c:a copy -c:v libx264 -preset ${optimalSettings.preset} -crf ${optimalSettings.crf} -pix_fmt yuv420p${optimalSettings.tune ? ` -tune ${optimalSettings.tune}` : ''} -profile:v ${optimalSettings.profile}${optimalSettings.level ? ` -level ${optimalSettings.level}` : ''} -movflags +faststart -y "${outputVideoPath}"`,
-      
-      // Команда 2: Используем ASS файл напрямую (оригинальный)
+      // Команда 1: Используем ASS файл напрямую (основная)
       `ffmpeg -i "${inputVideoPath}" -vf "ass='${assPath}'" -c:a copy -c:v libx264 -preset ${optimalSettings.preset} -crf ${optimalSettings.crf} -pix_fmt yuv420p${optimalSettings.tune ? ` -tune ${optimalSettings.tune}` : ''} -profile:v ${optimalSettings.profile}${optimalSettings.level ? ` -level ${optimalSettings.level}` : ''} -movflags +faststart -y "${outputVideoPath}"`,
       
-      // Команда 3: Fallback с medium качеством
+      // Команда 2: Fallback с medium качеством
       `ffmpeg -i "${inputVideoPath}" -vf "ass='${assPath}'" -c:a copy -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -movflags +faststart -y "${outputVideoPath}"`,
       
-      // Команда 4: Используем subtitles фильтр с ASS
+      // Команда 3: Используем subtitles фильтр с ASS
       `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${assPath}'" -c:a copy -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -y "${outputVideoPath}"`,
       
-      // Команда 5: Тест с drawtext для проверки (должен создать видимый фон)
-      `ffmpeg -i "${inputVideoPath}" -vf "drawtext=text='ТЕСТ ФОНА':fontcolor=white:fontsize=24:box=1:boxcolor=red@1.0:boxborderw=5:x=(w-text_w)/2:y=(h-text_h)/2" -c:a copy -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -y "${outputVideoPath}"`,
+      // Команда 4: Тест с drawtext для проверки (должен создать видимый фон)
+      `ffmpeg -i "${inputVideoPath}" -vf "drawtext=text='ТЕСТ КРАСНОГО ФОНА':fontcolor=white:fontsize=24:box=1:boxcolor=red@1.0:boxborderw=5:x=(w-text_w)/2:y=(h-text_h)/2" -c:a copy -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -y "${outputVideoPath}"`,
       
-      // Команда 6: Fallback к старому SRT методу
+      // Команда 5: Fallback к старому SRT методу
       `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}'" -c:a copy -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -y "${outputVideoPath}"`
     ];
 
