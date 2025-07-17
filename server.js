@@ -1,5 +1,5 @@
 // Beautiful Railway Service с кастомными стилями + МАКСИМАЛЬНОЕ КАЧЕСТВО + STREAMING
-// server.js - Custom subtitle styles + NO COMPRESSION + NO TIMEOUT + FIXED BACKGROUND
+// server.js - Custom subtitle styles + NO COMPRESSION + NO TIMEOUT
 
 const express = require('express');
 const multer = require('multer');
@@ -87,7 +87,7 @@ function buildCustomStyle(styleParams) {
     bold: false,
     outline: true,
     position: 'bottom',
-    background: '' // Пустая строка = прозрачный фон
+    background: false
   };
   
   // Объединяем с пользовательскими параметрами
@@ -100,20 +100,13 @@ function buildCustomStyle(styleParams) {
   params.fontcolor = (params.fontcolor || 'ffffff').replace('#', '').toLowerCase();
   
   // ✅ ИСПРАВЛЕНИЕ: Правильная обработка boolean параметров из строк
-  console.log(`[DEBUG] Before boolean parsing: bold="${params.bold}", outline="${params.outline}"`);
-  console.log(`[DEBUG] Background color: "${params.background}" (type: ${typeof params.background})`);
+  console.log(`[DEBUG] Before boolean parsing: bold="${params.bold}", outline="${params.outline}", background="${params.background}"`);
   
   params.bold = parseBooleanParam(params.bold);
   params.outline = parseBooleanParam(params.outline);
+  params.background = parseBooleanParam(params.background);
   
-  // ✅ НОВАЯ ЛОГИКА: background теперь строка с цветом
-  if (typeof params.background === 'string') {
-    params.background = params.background.trim().replace('#', '').toLowerCase();
-  } else {
-    params.background = '';
-  }
-  
-  console.log(`[DEBUG] After parsing: bold=${params.bold}, outline=${params.outline}, background="${params.background}"`);
+  console.log(`[DEBUG] After boolean parsing: bold=${params.bold}, outline=${params.outline}, background=${params.background}`);
   
   if (!['bottom', 'top', 'center'].includes(params.position)) {
     console.log(`[DEBUG] Invalid position "${params.position}", using default "bottom"`);
@@ -149,30 +142,19 @@ function buildCustomStyle(styleParams) {
     console.log(`[DEBUG] ❌ OUTLINE DISABLED: outline=0, shadow=0`);
   }
   
-  // ✅ ИСПРАВЛЕННАЯ ЛОГИКА ФОНА: теперь принимаем цвет как строку
-  if (params.background && params.background.length > 0) {
-    // Проверяем, что это валидный hex цвет (6 символов)
-    if (/^[0-9a-f]{6}$/i.test(params.background)) {
-      // Добавляем прозрачность 80 (50%) к цвету
-      style.backcolour = `&H80${params.background.toUpperCase()}`;
-      console.log(`[DEBUG] ✅ BACKGROUND ENABLED: Added backcolour=&H80${params.background.toUpperCase()}`);
-    } else if (/^[0-9a-f]{8}$/i.test(params.background)) {
-      // Если уже есть альфа-канал (8 символов)
-      style.backcolour = `&H${params.background.toUpperCase()}`;
-      console.log(`[DEBUG] ✅ BACKGROUND ENABLED: Added backcolour=&H${params.background.toUpperCase()}`);
-    } else {
-      console.log(`[DEBUG] ❌ INVALID BACKGROUND COLOR: "${params.background}", using default black`);
-      style.backcolour = '&H80000000'; // Черный с прозрачностью по умолчанию
-    }
+  // Добавляем фон если включен
+  if (params.background) {
+    style.backcolour = '&H80000000';  // Черный с 50% прозрачностью
+    console.log(`[DEBUG] ✅ BACKGROUND ENABLED: Added backcolour=&H80000000`);
   } else {
-    console.log(`[DEBUG] ❌ BACKGROUND DISABLED: no backcolour (transparent)`);
+    console.log(`[DEBUG] ❌ BACKGROUND DISABLED: no backcolour`);
   }
   
   console.log(`[DEBUG] Final style object:`, style);
   
   return {
     style,
-    description: `Custom style: ${params.fontsize}px, #${params.fontcolor}, ${params.position}, outline: ${params.outline}, bg: ${params.background || 'transparent'}, bold: ${params.bold}`
+    description: `Custom style: ${params.fontsize}px, ${params.fontcolor}, ${params.position}, outline: ${params.outline}, bg: ${params.background}, bold: ${params.bold}`
   };
 }
 
@@ -342,7 +324,7 @@ app.get('/health', (req, res) => {
       bold: 'boolean',
       outline: 'boolean',
       position: 'string (bottom/top/center)',
-      background: 'string (hex color or empty for transparent)'
+      background: 'boolean'
     },
     endpoints: [
       '/process-video-stream (Custom styles - JSON response)',
@@ -585,10 +567,8 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
         styleStr += `,MarginV=${style.marginv}`;
       }
       
-      // ✅ ИСПРАВЛЕННАЯ ОБРАБОТКА ФОНА: Проверяем наличие backcolour
       if (style.backcolour) {
         styleStr += `,BackColour=${style.backcolour}`;
-        console.log(`[DEBUG] 🎨 Added BackColour to FFmpeg style: ${style.backcolour}`);
       }
       
       return styleStr;
@@ -601,7 +581,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     const mainCommand = `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${styleString}'" -c:a copy -c:v libx264 -preset ${optimalSettings.preset} -crf ${optimalSettings.crf} -pix_fmt yuv420p${optimalSettings.tune ? ` -tune ${optimalSettings.tune}` : ''} -profile:v ${optimalSettings.profile}${optimalSettings.level ? ` -level ${optimalSettings.level}` : ''} -movflags +faststart -y "${outputVideoPath}"`;
 
     // Создаем fallback команды с упрощенными стилями
-    const simplifiedStyleString = `Fontname=DejaVu Sans,Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${selectedStyle.outline || 2}${selectedStyle.backcolour ? `,BackColour=${selectedStyle.backcolour}` : ''}`;
+    const simplifiedStyleString = `Fontname=DejaVu Sans,Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${selectedStyle.outline || 2}`;
     
     const commands = [
       mainCommand,
@@ -794,7 +774,7 @@ const server = app.listen(PORT, () => {
   console.log(`   • bold (true/false) - Bold text`);
   console.log(`   • outline (true/false) - Text outline`);
   console.log(`   • position (bottom/top/center) - Text position`);
-  console.log(`   • background (hex color or empty) - Background color`);
+  console.log(`   • background (true/false) - Black transparent background`);
   console.log(`🎯 Quality modes available:`);
   console.log(`   • auto - Adaptive quality based on input analysis`);
   console.log(`   • lossless - Perfect quality preservation (CRF 0)`);
