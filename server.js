@@ -78,6 +78,8 @@ const AVAILABLE_FONTS = [
 
 // 🎨 ФУНКЦИЯ СОЗДАНИЯ СТИЛЯ ИЗ ПАРАМЕТРОВ
 function buildCustomStyle(styleParams) {
+  console.log(`[DEBUG] buildCustomStyle called with:`, styleParams);
+  
   // Значения по умолчанию
   const defaults = {
     fontsize: 8,
@@ -91,20 +93,27 @@ function buildCustomStyle(styleParams) {
   // Объединяем с пользовательскими параметрами
   const params = { ...defaults, ...styleParams };
   
+  console.log(`[DEBUG] After applying defaults:`, params);
+  
   // Валидация параметров
   params.fontsize = Math.max(6, Math.min(12, parseInt(params.fontsize) || 8));
   params.fontcolor = (params.fontcolor || 'ffffff').replace('#', '').toLowerCase();
   
   // ✅ ИСПРАВЛЕНИЕ: Правильная обработка boolean параметров из строк
+  console.log(`[DEBUG] Before boolean parsing: bold="${params.bold}", outline="${params.outline}", background="${params.background}"`);
+  
   params.bold = parseBooleanParam(params.bold);
   params.outline = parseBooleanParam(params.outline);
   params.background = parseBooleanParam(params.background);
   
+  console.log(`[DEBUG] After boolean parsing: bold=${params.bold}, outline=${params.outline}, background=${params.background}`);
+  
   if (!['bottom', 'top', 'center'].includes(params.position)) {
+    console.log(`[DEBUG] Invalid position "${params.position}", using default "bottom"`);
     params.position = 'bottom';
   }
   
-  console.log(`[DEBUG] Parsed boolean params: bold=${params.bold}, outline=${params.outline}, background=${params.background}`);
+  console.log(`[DEBUG] Final params after validation:`, params);
   
   // Применяем позицию
   const positionSettings = SUBTITLE_POSITIONS[params.position];
@@ -120,24 +129,28 @@ function buildCustomStyle(styleParams) {
     marginv: positionSettings.marginv
   };
   
+  console.log(`[DEBUG] Base style created:`, style);
+  
   // Добавляем обводку если включена
   if (params.outline) {
     style.outline = 2;  // Фиксированная толщина 2px
     style.shadow = 1;   // Легкая тень для лучшей читаемости
-    console.log(`[DEBUG] Added outline: 2px with shadow`);
+    console.log(`[DEBUG] ✅ OUTLINE ENABLED: Added outline=2, shadow=1`);
   } else {
     style.outline = 0;
     style.shadow = 0;
-    console.log(`[DEBUG] Outline disabled`);
+    console.log(`[DEBUG] ❌ OUTLINE DISABLED: outline=0, shadow=0`);
   }
   
   // Добавляем фон если включен
   if (params.background) {
     style.backcolour = '&H80000000';  // Черный с 50% прозрачностью
-    console.log(`[DEBUG] Added background: black 50% transparent`);
+    console.log(`[DEBUG] ✅ BACKGROUND ENABLED: Added backcolour=&H80000000`);
   } else {
-    console.log(`[DEBUG] Background disabled`);
+    console.log(`[DEBUG] ❌ BACKGROUND DISABLED: no backcolour`);
   }
+  
+  console.log(`[DEBUG] Final style object:`, style);
   
   return {
     style,
@@ -147,16 +160,24 @@ function buildCustomStyle(styleParams) {
 
 // 🔧 HELPER ФУНКЦИЯ ДЛЯ ПАРСИНГА BOOLEAN ПАРАМЕТРОВ
 function parseBooleanParam(value) {
+  console.log(`[DEBUG] parseBooleanParam called with: "${value}" (type: ${typeof value})`);
+  
   if (typeof value === 'boolean') {
+    console.log(`[DEBUG] Already boolean: ${value}`);
     return value;
   }
   if (typeof value === 'string') {
     const lowercased = value.toLowerCase().trim();
-    return lowercased === 'true' || lowercased === '1' || lowercased === 'yes';
+    const result = lowercased === 'true' || lowercased === '1' || lowercased === 'yes';
+    console.log(`[DEBUG] String "${value}" -> lowercased "${lowercased}" -> result: ${result}`);
+    return result;
   }
   if (typeof value === 'number') {
-    return value !== 0;
+    const result = value !== 0;
+    console.log(`[DEBUG] Number ${value} -> result: ${result}`);
+    return result;
   }
+  console.log(`[DEBUG] Unknown type, defaulting to false`);
   return false;
 }
 
@@ -469,7 +490,13 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     
     console.log(`[${taskId}] Video size: ${(videoBuffer.length / 1024 / 1024).toFixed(2)}MB`);
     console.log(`[${taskId}] Raw SRT length: ${rawSrtContent.length} chars`);
-    console.log(`[${taskId}] 🎨 Custom style params:`, styleParams);
+    console.log(`[${taskId}] 🎨 RAW INCOMING STYLE PARAMS:`);
+    console.log(`[${taskId}]   fontsize: "${styleParams.fontsize}" (type: ${typeof styleParams.fontsize})`);
+    console.log(`[${taskId}]   fontcolor: "${styleParams.fontcolor}" (type: ${typeof styleParams.fontcolor})`);
+    console.log(`[${taskId}]   bold: "${styleParams.bold}" (type: ${typeof styleParams.bold})`);
+    console.log(`[${taskId}]   outline: "${styleParams.outline}" (type: ${typeof styleParams.outline})`);
+    console.log(`[${taskId}]   position: "${styleParams.position}" (type: ${typeof styleParams.position})`);
+    console.log(`[${taskId}]   background: "${styleParams.background}" (type: ${typeof styleParams.background})`);
     console.log(`[${taskId}] 🎯 Quality mode: ${forceQuality}`);
     
     // 🎨 СОЗДАЕМ КАСТОМНЫЙ СТИЛЬ
