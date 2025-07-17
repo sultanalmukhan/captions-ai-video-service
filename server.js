@@ -186,11 +186,11 @@ function parseBooleanParam(value) {
   return false;
 }
 
-// 🎨 ФУНКЦИЯ СОЗДАНИЯ СТИЛЯ ИЗ ПАРАМЕТРОВ (ОБНОВЛЕННАЯ)
+// 🎨 ФУНКЦИЯ СОЗДАНИЯ СТИЛЯ ИЗ ПАРАМЕТРОВ (ИСПРАВЛЕННАЯ ПО ОБРАЗЦУ РАБОЧЕГО КОДА)
 function buildCustomStyle(styleParams) {
   console.log(`[DEBUG] buildCustomStyle called with:`, styleParams);
   
-  // Значения по умолчанию
+  // Значения по умолчанию (как в рабочих готовых стилях)
   const defaults = {
     fontsize: 8,
     fontcolor: 'ffffff',
@@ -215,37 +215,53 @@ function buildCustomStyle(styleParams) {
   params.outline = parseBooleanParam(params.outline);
   console.log(`[DEBUG] After boolean parsing: bold=${params.bold}, outline=${params.outline}`);
   
-  // Обработка цвета фона
-  console.log(`[DEBUG] Processing background parameter: "${params.background}" (type: ${typeof params.background})`);
-  let backgroundData = processBackgroundParam(params.background);
-  console.log(`[DEBUG] Background processing result:`, backgroundData);
+  // 🎯 ИСПРАВЛЕНИЕ: Создаем backcolour в том же формате, что в рабочих стилях
+  let backcolour = null;
+  if (params.background && params.background.trim() !== "") {
+    console.log(`[DEBUG] Processing background: "${params.background}"`);
+    
+    // Убираем # если есть
+    let cleanColor = params.background.replace('#', '').toLowerCase();
+    
+    if (/^[0-9a-f]{6}$/i.test(cleanColor)) {
+      // 6-значный HEX -> формат как в рабочих стилях (&H80RRGGBB)
+      backcolour = `&H80${cleanColor.toUpperCase()}`;
+      console.log(`[DEBUG] ✅ Created backcolour: ${backcolour} (semi-transparent)`);
+    } else if (/^[0-9a-f]{3}$/i.test(cleanColor)) {
+      // 3-значный HEX
+      const expandedHex = cleanColor.split('').map(char => char + char).join('');
+      backcolour = `&H80${expandedHex.toUpperCase()}`;
+      console.log(`[DEBUG] ✅ Created backcolour from short hex: ${backcolour}`);
+    } else if (/^[0-9a-f]{8}$/i.test(cleanColor)) {
+      // 8-значный HEX с альфой
+      const alpha = cleanColor.substring(6, 8);
+      const color = cleanColor.substring(0, 6);
+      backcolour = `&H${alpha.toUpperCase()}${color.toUpperCase()}`;
+      console.log(`[DEBUG] ✅ Created backcolour with custom alpha: ${backcolour}`);
+    }
+  }
   
   if (!['bottom', 'top', 'center'].includes(params.position)) {
     console.log(`[DEBUG] Invalid position "${params.position}", using default "bottom"`);
     params.position = 'bottom';
   }
   
-  console.log(`[DEBUG] Final params after validation:`, { ...params, background: backgroundData });
-  
   // Применяем позицию
   const positionSettings = SUBTITLE_POSITIONS[params.position];
   
-  // Строим финальный стиль
+  // 🎯 СТРОИМ ФИНАЛЬНЫЙ СТИЛЬ КАК В РАБОЧИХ ГОТОВЫХ СТИЛЯХ
   const style = {
     fontsize: params.fontsize,
     fontcolor: params.fontcolor,
-    fontname: AVAILABLE_FONTS[0],
-    fontnames: AVAILABLE_FONTS,
+    fontname: 'DejaVu Sans',  // Фиксированный шрифт как в рабочих стилях
     bold: params.bold ? 1 : 0,
     alignment: positionSettings.alignment,
     marginv: positionSettings.marginv
   };
   
-  console.log(`[DEBUG] Base style created:`, style);
-  
-  // Добавляем обводку если включена
+  // Добавляем обводку если включена (как в рабочих стилях)
   if (params.outline) {
-    style.outline = 2;
+    style.outline = 2;  // Фиксированные значения как в tiktok_classic
     style.shadow = 1;
     console.log(`[DEBUG] ✅ OUTLINE ENABLED: Added outline=2, shadow=1`);
   } else {
@@ -254,19 +270,19 @@ function buildCustomStyle(styleParams) {
     console.log(`[DEBUG] ❌ OUTLINE DISABLED: outline=0, shadow=0`);
   }
   
-  // Добавляем фон если включен
-  if (backgroundData.enabled) {
-    style.backcolour = backgroundData.color;
-    console.log(`[DEBUG] ✅ BACKGROUND ENABLED: Added backcolour=${backgroundData.color} (${backgroundData.description})`);
+  // 🎯 КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: добавляем backcolour точно так же, как в рабочих стилях
+  if (backcolour) {
+    style.backcolour = backcolour;
+    console.log(`[DEBUG] ✅ BACKGROUND ENABLED: Added backcolour=${backcolour} (same format as working styles)`);
   } else {
-    console.log(`[DEBUG] ❌ BACKGROUND DISABLED: no backcolour (${backgroundData.description})`);
+    console.log(`[DEBUG] ❌ BACKGROUND DISABLED: no backcolour`);
   }
   
-  console.log(`[DEBUG] Final style object:`, style);
+  console.log(`[DEBUG] Final style object (matching working style format):`, style);
   
   return {
     style,
-    description: `Custom style: ${params.fontsize}px, ${params.fontcolor}, ${params.position}, outline: ${params.outline}, bg: ${backgroundData.description}, bold: ${params.bold}`
+    description: `Custom style: ${params.fontsize}px, ${params.fontcolor}, ${params.position}, outline: ${params.outline}, bg: ${backcolour ? 'enabled' : 'disabled'}, bold: ${params.bold}`
   };
 }
 
@@ -400,7 +416,7 @@ app.get('/health', (req, res) => {
     status: 'healthy', 
     timestamp: new Date().toISOString(),
     mode: 'CUSTOM_STYLES_WITH_MAXIMUM_QUALITY_STREAMING',
-    style_system: 'CUSTOM_PARAMETERS_WITH_HEX_BACKGROUND',
+    style_system: 'ASS_V4_PLUS_WITH_BACKGROUND_SUPPORT',
     available_fonts: AVAILABLE_FONTS,
     available_positions: Object.keys(SUBTITLE_POSITIONS),
     quality_mode: 'NO_COMPRESSION_MAXIMUM_QUALITY_STREAMING_ENABLED',
@@ -426,8 +442,13 @@ app.get('/health', (req, res) => {
       red_transparent: 'background: "ff000080"',
       custom_color: 'background: "ff8040"'
     },
+    ass_info: {
+      format: 'ASS V4+ with BorderStyle=3 for opaque background',
+      background_method: 'BackColour parameter in ASS style definition',
+      fallback_test: 'Command 5 uses drawtext with visible red box for testing'
+    },
     endpoints: [
-      '/process-video-stream (Custom styles with HEX color background)',
+      '/process-video-stream (ASS format with background support)',
       '/health (This endpoint)'
     ],
     ...systemInfo
@@ -681,20 +702,26 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
 
     // 🎨 СТРОИМ УПРОЩЕННУЮ FFMPEG КОМАНДУ ДЛЯ ASS
     const commands = [
-      // Команда 1: Используем ASS файл напрямую (должно работать с фоном)
+      // Команда 1: Тест с явной загрузкой libass
+      `ffmpeg -i "${inputVideoPath}" -vf "ass='${assPath}':force_style='BorderStyle=3'" -c:a copy -c:v libx264 -preset ${optimalSettings.preset} -crf ${optimalSettings.crf} -pix_fmt yuv420p${optimalSettings.tune ? ` -tune ${optimalSettings.tune}` : ''} -profile:v ${optimalSettings.profile}${optimalSettings.level ? ` -level ${optimalSettings.level}` : ''} -movflags +faststart -y "${outputVideoPath}"`,
+      
+      // Команда 2: Используем ASS файл напрямую (оригинальный)
       `ffmpeg -i "${inputVideoPath}" -vf "ass='${assPath}'" -c:a copy -c:v libx264 -preset ${optimalSettings.preset} -crf ${optimalSettings.crf} -pix_fmt yuv420p${optimalSettings.tune ? ` -tune ${optimalSettings.tune}` : ''} -profile:v ${optimalSettings.profile}${optimalSettings.level ? ` -level ${optimalSettings.level}` : ''} -movflags +faststart -y "${outputVideoPath}"`,
       
-      // Команда 2: Fallback с medium качеством
+      // Команда 3: Fallback с medium качеством
       `ffmpeg -i "${inputVideoPath}" -vf "ass='${assPath}'" -c:a copy -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -movflags +faststart -y "${outputVideoPath}"`,
       
-      // Команда 3: Используем subtitles фильтр с ASS
+      // Команда 4: Используем subtitles фильтр с ASS
       `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${assPath}'" -c:a copy -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -y "${outputVideoPath}"`,
       
-      // Команда 4: Fallback к старому SRT методу
+      // Команда 5: Тест с drawtext для проверки (должен создать видимый фон)
+      `ffmpeg -i "${inputVideoPath}" -vf "drawtext=text='ТЕСТ ФОНА':fontcolor=white:fontsize=24:box=1:boxcolor=red@1.0:boxborderw=5:x=(w-text_w)/2:y=(h-text_h)/2" -c:a copy -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -y "${outputVideoPath}"`,
+      
+      // Команда 6: Fallback к старому SRT методу
       `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}'" -c:a copy -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -y "${outputVideoPath}"`
     ];
 
-    console.log(`[${taskId}] 🔧 FFMPEG COMMANDS WITH ASS FORMAT:`);
+    console.log(`[${taskId}] 🔧 FFMPEG COMMANDS WITH ASS FORMAT AND TESTS:`);
     commands.forEach((cmd, index) => {
       console.log(`[${taskId}] Command ${index + 1}: ${cmd}`);
     });
