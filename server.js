@@ -116,39 +116,50 @@ function processBackgroundColor(colorString) {
   
   // Обрабатываем только HEX цвета
   if (/^[0-9a-f]{6}$/i.test(cleanColor)) {
-    // 6-значный HEX: ff0000
-    const ffmpegColor = `&HFF${cleanColor.toUpperCase()}`;
-    console.log(`[DEBUG] 6-digit HEX "${cleanColor}" -> ${ffmpegColor} (fully opaque)`);
+    // 6-значный HEX: ff0000 -> BGR формат для ASS
+    const r = cleanColor.substring(0, 2);
+    const g = cleanColor.substring(2, 4);
+    const b = cleanColor.substring(4, 6);
+    // ASS использует BGR формат, не RGB!
+    const assColor = `&H${b}${g}${r}`.toUpperCase();
+    console.log(`[DEBUG] 6-digit HEX "${cleanColor}" -> RGB(${r},${g},${b}) -> ASS BGR: ${assColor}`);
     return {
       enabled: true,
-      color: ffmpegColor,
-      description: `#${cleanColor} (solid)`
+      color: assColor,
+      description: `#${cleanColor} (solid BGR)`
     };
   }
   
   if (/^[0-9a-f]{3}$/i.test(cleanColor)) {
     // 3-значный HEX: f00 -> ff0000
     const expandedHex = cleanColor.split('').map(char => char + char).join('');
-    const ffmpegColor = `&HFF${expandedHex.toUpperCase()}`;
-    console.log(`[DEBUG] 3-digit HEX "${cleanColor}" expanded to "${expandedHex}" -> ${ffmpegColor} (solid)`);
+    const r = expandedHex.substring(0, 2);
+    const g = expandedHex.substring(2, 4);
+    const b = expandedHex.substring(4, 6);
+    // ASS использует BGR формат
+    const assColor = `&H${b}${g}${r}`.toUpperCase();
+    console.log(`[DEBUG] 3-digit HEX "${cleanColor}" expanded to "${expandedHex}" -> ASS BGR: ${assColor}`);
     return {
       enabled: true,
-      color: ffmpegColor,
-      description: `#${expandedHex} (solid)`
+      color: assColor,
+      description: `#${expandedHex} (solid BGR)`
     };
   }
   
   // Обрабатываем HEX с альфа-каналом
   if (/^[0-9a-f]{8}$/i.test(cleanColor)) {
     // 8-значный HEX с альфой: ff000080
+    const r = cleanColor.substring(0, 2);
+    const g = cleanColor.substring(2, 4);
+    const b = cleanColor.substring(4, 6);
     const alpha = cleanColor.substring(6, 8);
-    const color = cleanColor.substring(0, 6);
-    const ffmpegColor = `&H${alpha.toUpperCase()}${color.toUpperCase()}`;
-    console.log(`[DEBUG] 8-digit HEX with alpha "${cleanColor}" -> ${ffmpegColor}`);
+    // ASS: ALPHA + BGR формат
+    const assColor = `&H${alpha}${b}${g}${r}`.toUpperCase();
+    console.log(`[DEBUG] 8-digit HEX with alpha "${cleanColor}" -> RGBA(${r},${g},${b},${alpha}) -> ASS ABGR: ${assColor}`);
     return {
       enabled: true,
-      color: ffmpegColor,
-      description: `#${color} (${Math.round(parseInt(alpha, 16) / 255 * 100)}% opacity)`
+      color: assColor,
+      description: `#${r}${g}${b} (${Math.round(parseInt(alpha, 16) / 255 * 100)}% opacity BGR)`
     };
   }
   
