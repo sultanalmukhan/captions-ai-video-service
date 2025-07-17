@@ -631,6 +631,13 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     fs.writeFileSync(assPath, assContent, 'utf8');
     console.log(`[${taskId}] 🎨 ASS file saved: ${assPath}`);
 
+    // 🎨 СОЗДАЕМ FALLBACK SRT НА СЛУЧАЙ ПРОБЛЕМ С ASS
+    const srtContent = rawSrtContent
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      .trim();
+    fs.writeFileSync(srtPath, srtContent, 'utf8');
+
     // 🎨 СТРОИМ УПРОЩЕННУЮ FFMPEG КОМАНДУ ДЛЯ ASS
     const commands = [
       // Команда 1: Используем ASS файл напрямую (должно работать с фоном)
@@ -777,11 +784,11 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
         encoding: 'base64'
       },
       style_info: {
-        type: 'custom',
+        type: 'custom_ass',
         description: styleDescription,
         parameters: styleParams,
         final_style: selectedStyle,
-        ffmpeg_style_string: styleString,
+        ass_style_format: 'ASS V4+ Style with BackColour support',
         position_name: SUBTITLE_POSITIONS[styleParams.position || 'bottom'].name
       },
       quality_info: {
