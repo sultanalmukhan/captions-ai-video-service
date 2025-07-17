@@ -520,6 +520,44 @@ function convertTimeToASS(srtTime) {
 function generateASSContent(subtitles, customStyle, taskId) {
   console.log(`[${taskId}] 🎨 Generating ASS with style:`, customStyle);
   
+  // Правильный порядок полей для ASS Style
+  // Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+  
+  const fontname = customStyle.fontname || 'Arial';
+  const fontsize = customStyle.fontsize || 8;
+  const primaryColour = customStyle.fontcolor ? `&H${customStyle.fontcolor.toUpperCase()}` : '&HFFFFFF';
+  const secondaryColour = '&H000000';  // Вторичный цвет
+  const outlineColour = '&H000000';    // Цвет обводки (черный)
+  const backColour = customStyle.backcolour || '&H80000000';  // Фон с альфой
+  const bold = customStyle.bold ? 1 : 0;
+  const italic = 0;
+  const underline = 0;
+  const strikeout = 0;
+  const scaleX = 100;
+  const scaleY = 100;
+  const spacing = 0;
+  const angle = 0;
+  const borderStyle = 1;  // 1 = outline+shadow, 3 = opaque box
+  const outline = customStyle.outline || 0;
+  const shadow = customStyle.shadow || 0;
+  const alignment = customStyle.alignment || 2;
+  const marginL = 10;
+  const marginR = 10;
+  const marginV = customStyle.marginv || 15;
+  const encoding = 1;
+  
+  // ВАЖНО: Если есть фон, используем BorderStyle = 3 (opaque box)
+  const actualBorderStyle = customStyle.backcolour ? 3 : 1;
+  
+  console.log(`[${taskId}] 🎨 ASS Style parameters:`);
+  console.log(`[${taskId}] 🎨   Fontname: ${fontname}`);
+  console.log(`[${taskId}] 🎨   Fontsize: ${fontsize}`);
+  console.log(`[${taskId}] 🎨   PrimaryColour: ${primaryColour}`);
+  console.log(`[${taskId}] 🎨   BackColour: ${backColour}`);
+  console.log(`[${taskId}] 🎨   BorderStyle: ${actualBorderStyle} ${actualBorderStyle === 3 ? '(opaque box for background)' : '(outline+shadow)'}`);
+  console.log(`[${taskId}] 🎨   Outline: ${outline}`);
+  console.log(`[${taskId}] 🎨   Alignment: ${alignment}`);
+  
   // ASS заголовок
   let ass = `[Script Info]
 Title: Custom Subtitles
@@ -527,7 +565,7 @@ ScriptType: v4.00+
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,${customStyle.fontname || 'DejaVu Sans'},${customStyle.fontsize},${customStyle.fontcolor ? '&H' + customStyle.fontcolor.toUpperCase() : '&HFFFFFF'},&H000000,${customStyle.outline > 0 ? '&H000000' : '&H000000'},${customStyle.backcolour || '&H000000'},${customStyle.bold || 0},0,0,0,100,100,0,0,1,${customStyle.outline || 0},${customStyle.shadow || 0},${customStyle.alignment || 2},10,10,${customStyle.marginv || 15},1
+Style: Default,${fontname},${fontsize},${primaryColour},${secondaryColour},${outlineColour},${backColour},${bold},${italic},${underline},${strikeout},${scaleX},${scaleY},${spacing},${angle},${actualBorderStyle},${outline},${shadow},${alignment},${marginL},${marginR},${marginV},${encoding}
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -538,9 +576,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     ass += `Dialogue: 0,${sub.start},${sub.end},Default,,0,0,0,,${sub.text}\n`;
   });
   
-  console.log(`[${taskId}] 🎨 ASS Style line:`);
-  const styleLine = `Style: Default,${customStyle.fontname || 'DejaVu Sans'},${customStyle.fontsize},${customStyle.fontcolor ? '&H' + customStyle.fontcolor.toUpperCase() : '&HFFFFFF'},&H000000,${customStyle.outline > 0 ? '&H000000' : '&H000000'},${customStyle.backcolour || '&H000000'},${customStyle.bold || 0},0,0,0,100,100,0,0,1,${customStyle.outline || 0},${customStyle.shadow || 0},${customStyle.alignment || 2},10,10,${customStyle.marginv || 15},1`;
+  console.log(`[${taskId}] 🎨 Final ASS Style line:`);
+  const styleLine = `Style: Default,${fontname},${fontsize},${primaryColour},${secondaryColour},${outlineColour},${backColour},${bold},${italic},${underline},${strikeout},${scaleX},${scaleY},${spacing},${angle},${actualBorderStyle},${outline},${shadow},${alignment},${marginL},${marginR},${marginV},${encoding}`;
   console.log(`[${taskId}] 🎨 ${styleLine}`);
+  
+  console.log(`[${taskId}] 🎨 Full ASS content preview:`);
+  console.log(`[${taskId}] 🎨 ${ass.substring(0, 500)}...`);
   
   return ass;
 }
