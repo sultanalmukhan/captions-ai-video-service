@@ -360,7 +360,67 @@ function getSystemInfo() {
   }
 }
 
-// Функция очистки и красивого форматирования SRT
+// Функция конвертации SRT в ASS с поддержкой background
+function convertSRTtoASS(srtContent, style, taskId) {
+  console.log(`[${taskId}] 🔄 Converting SRT to ASS for background support...`);
+  
+  // ASS заголовок с нашим стилем
+  let assContent = `[Script Info]
+Title: Custom Subtitles
+ScriptType: v4.00+
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,${style.fontname || 'DejaVu Sans'},${style.fontsize || 8},&H${style.fontcolor || 'ffffff'},&H${style.fontcolor || 'ffffff'},&H000000,${style.backcolour || '&H00000000'},${style.bold || 0},0,0,0,100,100,0,0,1,${style.outline || 0},${style.shadow || 0},${style.alignment || 2},0,0,${style.marginv || 15},1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+`;
+
+  // Парсим SRT и конвертируем в ASS
+  const srtLines = srtContent.split('\n');
+  let i = 0;
+  
+  while (i < srtLines.length) {
+    const line = srtLines[i].trim();
+    
+    // Пропускаем номера субтитров
+    if (/^\d+$/.test(line)) {
+      i++;
+      continue;
+    }
+    
+    // Обрабатываем временные метки
+    if (line.includes('-->')) {
+      const timeMatch = line.match(/(\d{2}:\d{2}:\d{2},\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2},\d{3})/);
+      if (timeMatch) {
+        // Конвертируем время из SRT формата в ASS формат
+        const startTime = timeMatch[1].replace(',', '.');
+        const endTime = timeMatch[2].replace(',', '.');
+        
+        // Собираем текст субтитра
+        i++;
+        let subtitleText = '';
+        while (i < srtLines.length && srtLines[i].trim() !== '') {
+          if (subtitleText) subtitleText += '\\N'; // ASS line break
+          subtitleText += srtLines[i].trim();
+          i++;
+        }
+        
+        // Добавляем событие в ASS
+        if (subtitleText) {
+          assContent += `Dialogue: 0,${startTime}0,${endTime}0,Default,,0,0,0,,${subtitleText}\n`;
+        }
+      }
+    }
+    i++;
+  }
+  
+  console.log(`[${taskId}] ✅ SRT to ASS conversion complete`);
+  console.log(`[${taskId}] ASS preview:`, assContent.substring(0, 500));
+  
+  return assContent;
+}
 function beautifySRT(srtContent, taskId) {
   console.log(`[${taskId}] Beautifying SRT text...`);
   console.log(`[${taskId}] Original SRT length: ${srtContent.length} chars`);
@@ -530,9 +590,26 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     const optimalSettings = getQualitySettings(forceQuality, videoQuality);
     console.log(`[${taskId}] ⚙️ Quality settings:`, optimalSettings);
 
-    // Beautify SRT
-    const beautifiedSRT = beautifySRT(rawSrtContent, taskId);
-    fs.writeFileSync(srtPath, beautifiedSRT, 'utf8');
+    // 🎯 ОПРЕДЕЛЯЕМ ФОРМАТ СУБТИТРОВ (ASS если нужен background)
+    const needsBackground = selectedStyle.backcolour && selectedStyle.backcolour !== '';
+    const subtitleFormat = needsBackground ? 'ass' : 'srt';
+    const subtitleExt = needsBackground ? '.ass' : '.srt';
+    
+    console.log(`[${taskId}] 📋 Subtitle format: ${subtitleFormat.toUpperCase()} (background needed: ${needsBackground})`);
+
+    // Beautify SRT или конвертируем в ASS
+    let subtitleContent;
+    if (needsBackground) {
+      // Сначала beautify SRT, потом конвертируем в ASS
+      const beautifiedSRT = beautifySRT(rawSrtContent, taskId);
+      subtitleContent = convertSRTtoASS(beautifiedSRT, selectedStyle, taskId);
+    } else {
+      // Обычный SRT
+      subtitleContent = beautifySRT(rawSrtContent, taskId);
+    }
+    
+    const srtPath = path.join(tempDir, `stream_subtitles_${taskId}${subtitleExt}`);
+    fs.writeFileSync(srtPath, subtitleContent, 'utf8');
 
     // 🎨 СТРОИМ STYLE STRING ДЛЯ FFMPEG
     const buildStyleString = (style) => {
@@ -614,18 +691,35 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
       console.log(`[${taskId}] Command ${i + 1}: ${cmd.substring(0, 150)}...`);
     });
 
+    // 🎯 ВЫБИРАЕМ КОМАНДЫ ИСХОДЯ ИЗ ФОРМАТА СУБТИТРОВ
+    let finalCommands;
+    if (needsBackground) {
+      // Для ASS файлов - без force_style, стиль уже в файле
+      console.log(`[${taskId}] 🎨 Using ASS format - style embedded in file`);
+      finalCommands = [
+        `ffmpeg -i "${inputVideoPath}" -vf "ass='${srtPath}'" -c:a copy -c:v libx264 -preset ${optimalSettings.preset} -crf ${optimalSettings.crf} -pix_fmt yuv420p${optimalSettings.tune ? ` -tune ${optimalSettings.tune}` : ''} -profile:v ${optimalSettings.profile}${optimalSettings.level ? ` -level ${optimalSettings.level}` : ''} -movflags +faststart -y "${outputVideoPath}"`,
+        `ffmpeg -i "${inputVideoPath}" -vf "ass='${srtPath}'" -c:a copy -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -movflags +faststart -y "${outputVideoPath}"`,
+        `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}'" -c:a copy -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -y "${outputVideoPath}"`,
+        `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}'" -c:a copy -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -y "${outputVideoPath}"`
+      ];
+    } else {
+      // Для SRT файлов - используем force_style
+      console.log(`[${taskId}] 🎨 Using SRT format with force_style`);
+      finalCommands = commands;
+    }
+
     let success = false;
     let usedCommand = 0;
 
     // Выполняем команды ПОСЛЕДОВАТЕЛЬНО
-    for (let i = 0; i < commands.length && !success; i++) {
+    for (let i = 0; i < finalCommands.length && !success; i++) {
       try {
-        console.log(`[${taskId}] 🎨 Trying custom style method ${i + 1}...`);
+        console.log(`[${taskId}] 🎨 Trying ${subtitleFormat.toUpperCase()} method ${i + 1}...`);
         
         if (fs.existsSync(outputVideoPath)) fs.unlinkSync(outputVideoPath);
         
         const cmdStartTime = Date.now();
-        execSync(commands[i], { 
+        execSync(finalCommands[i], { 
           stdio: 'pipe',
           timeout: 600000,
           maxBuffer: 1024 * 1024 * 200
