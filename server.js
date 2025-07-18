@@ -120,9 +120,8 @@ function buildCustomStyle(styleParams) {
   const backgroundInfo = parseBackgroundColor(params.background);
   if (backgroundInfo.enabled) {
     style.backcolour = backgroundInfo.ffmpegColor;
-    // ИСПРАВЛЕНИЕ: Используем BorderStyle=4 для прямоугольного фона
-    // BorderStyle=3 создавал черный артефакт, BorderStyle=4 - чистый прямоугольник
-    style.borderstyle = 4;
+    // ЭКСПЕРИМЕНТ: Попробуем BorderStyle=3 (может быть он все-таки нужен)
+    style.borderstyle = 3;
   }
   
   return {
@@ -629,32 +628,60 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     // Создаем массив команд
     let commands = [mainCommand];
     
-    // Если это черный фон, добавляем специальные fallback варианты
+    // Если это черный фон, добавляем специальные fallback варианты с разными BorderStyle
     if (selectedStyle.backcolour && backgroundInfo.isBlackVariant) {
       console.log(`[${taskId}] Adding special black background fallbacks...`);
       
-      const blackVariants = [
-        '&HFF010101', // RGB(1,1,1)
-        '&HFF101010', // RGB(16,16,16)  
-        '&HE0000000', // Черный 88% непрозрачность
-        '&HC0000000', // Черный 75% непрозрачность
-        '&H80000000', // Черный 50% непрозрачность (рабочий вариант)
+      const testCombinations = [
+        { color: '&HFF010101', border: 3, desc: 'Almost black + BorderStyle=3' },
+        { color: '&HFF010101', border: 4, desc: 'Almost black + BorderStyle=4' },
+        { color: '&HFF101010', border: 3, desc: 'Dark gray + BorderStyle=3' },
+        { color: '&HFF101010', border: 4, desc: 'Dark gray + BorderStyle=4' },
+        { color: '&HE0000000', border: 3, desc: 'Black 88% + BorderStyle=3' },
+        { color: '&HC0000000', border: 3, desc: 'Black 75% + BorderStyle=3' },
+        { color: '&H80000000', border: 3, desc: 'Black 50% + BorderStyle=3' },
+        { color: '&HFF202020', border: 3, desc: 'Very dark gray + BorderStyle=3' },
       ];
       
-      blackVariants.forEach((blackColor, index) => {
-        const blackStyleString = styleString.replace(selectedStyle.backcolour, blackColor);
-        const blackCommand = `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${blackStyleString}'" -c:a copy -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -movflags +faststart -y "${outputVideoPath}"`;
-        commands.push(blackCommand);
-        console.log(`[${taskId}] Black variant ${index + 1}: ${blackColor}`);
+      testCombinations.forEach((combo, index) => {
+        const testStyleString = styleString
+          .replace(selectedStyle.backcolour, combo.color)
+          .replace(/BorderStyle=\d+/, `BorderStyle=${combo.border}`);
+        const testCommand = `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${testStyleString}'" -c:a copy -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -movflags +faststart -y "${outputVideoPath}"`;
+        commands.push(testCommand);
+        console.log(`[${taskId}] Test ${index + 1}: ${combo.desc} -> ${combo.color},BorderStyle=${combo.border}`);
       });
     }
 
-    const simplifiedStyleString = `Fontname=DejaVu Sans,Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${selectedStyle.outline || 2}${selectedStyle.backcolour ? `,BackColour=${selectedStyle.backcolour},BorderStyle=4` : ''}`;
+    const simplifiedStyleString = `Fontname=DejaVu Sans,Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${selectedStyle.outline || 2}${selectedStyle.backcolour ? `,BackColour=${selectedStyle.backcolour},BorderStyle=3` : ''}`;
     
-    // Добавляем стандартные fallback команды
+    // Добавляем стандартные fallback команды + эксперименты с фоном
     commands.push(
       `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${styleString}'" -c:a copy -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -movflags +faststart -y "${outputVideoPath}"`,
-      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${simplifiedStyleString}'" -c:a copy -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -y "${outputVideoPath}"`,
+      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${simplifiedStyleString}'" -c:a copy -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -y "${outputVideoPath}"`
+    );
+    
+    // Добавляем эксперименты с BorderStyle для любого фона (не только черного)
+    if (selectedStyle.backcolour) {
+      console.log(`[${taskId}] Adding BorderStyle experiments for background...`);
+      
+      const borderStyleTests = [
+        { style: 1, desc: 'BorderStyle=1 (outline only)' },
+        { style: 2, desc: 'BorderStyle=2 (unknown)' },
+        { style: 3, desc: 'BorderStyle=3 (opaque background)' },
+        { style: 4, desc: 'BorderStyle=4 (transparent background)' },
+      ];
+      
+      borderStyleTests.forEach((test, index) => {
+        const testStyle = styleString.replace(/BorderStyle=\d+/, `BorderStyle=${test.style}`);
+        const testCommand = `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${testStyle}'" -c:a copy -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -y "${outputVideoPath}"`;
+        commands.push(testCommand);
+        console.log(`[${taskId}] BorderStyle test ${index + 1}: ${test.desc}`);
+      });
+    }
+    
+    // Финальный fallback без кастомных стилей
+    commands.push(
       `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}'" -c:a copy -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -y "${outputVideoPath}"`
     );
 
