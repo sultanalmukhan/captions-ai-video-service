@@ -185,9 +185,19 @@ function parseBackgroundColor(backgroundParam, opacityParam) {
   
   // Конвертируем opacity (0-1) в hex (00-FF)
   // ВАЖНО: opacity где 0=прозрачный, 1=видимый
-  // ПРОБЛЕМА: Возможно FFmpeg интерпретирует альфа наоборот
-  const opacity = parseFloat(opacityParam) || 0.5;
+  // ИСПРАВЛЕНИЕ: Правильно обрабатываем 0 как валидное значение
+  let opacity = parseFloat(opacityParam);
+  
+  // Проверяем на NaN и undefined, но НЕ на 0 (0 - валидное значение!)
+  if (isNaN(opacity) || opacityParam === undefined || opacityParam === null || opacityParam === '') {
+    opacity = 0.5; // Default только если действительно не задано
+  }
+  
+  // Ограничиваем диапазон 0-1
+  opacity = Math.max(0, Math.min(1, opacity));
+  
   console.log(`[DEBUG] Raw opacity: "${opacityParam}" -> parsed: ${opacity}`);
+  console.log(`[DEBUG] Is zero opacity: ${opacity === 0 ? 'YES - should be fully transparent' : 'NO'}`);
   
   // ТЕСТИРУЕМ ОБЕ ЛОГИКИ:
   const directAlpha = Math.round(opacity * 255);           // Прямая: 0.1 -> 26, 0.9 -> 230
@@ -202,7 +212,12 @@ function parseBackgroundColor(backgroundParam, opacityParam) {
   
   console.log(`[DEBUG] USING INVERTED: ${opacity} opacity -> alpha=${alpha} (${alphaValue}/255)`);
   console.log(`[DEBUG] Logic test: opacity ${opacity} should be ${Math.round(opacity * 100)}% visible`);
-  console.log(`[DEBUG] With inverted alpha ${alpha}: ${opacity > 0.5 ? 'should be MORE visible' : 'should be LESS visible'}`);
+  
+  if (opacity === 0) {
+    console.log(`[DEBUG] ⚠️ ZERO OPACITY: Should produce alpha=FF (255) for fully transparent background`);
+  } else if (opacity === 1) {
+    console.log(`[DEBUG] ✅ FULL OPACITY: Should produce alpha=00 (0) for fully visible background`);
+  }
   
   // FFmpeg использует формат &HAABBGGRR (обратный порядок + альфа в начале)
   const ffmpegColor = `&H${alpha}${blue}${green}${red}`.toUpperCase();
