@@ -81,7 +81,7 @@ function buildCustomStyle(styleParams) {
     outline: true,
     position: 'bottom',
     background: '',
-    backgroundTransparency: 0.5
+    backgroundOpacity: 0.5
   };
   
   const params = { ...defaults, ...styleParams };
@@ -92,8 +92,8 @@ function buildCustomStyle(styleParams) {
   params.bold = parseBooleanParam(params.bold);
   params.outline = parseBooleanParam(params.outline);
   
-  // Валидация backgroundTransparency (0-1)
-  params.backgroundTransparency = Math.max(0, Math.min(1, parseFloat(params.backgroundTransparency) || 0.5));
+  // Валидация backgroundOpacity (0-1, где 0=прозрачный, 1=видимый)
+  params.backgroundOpacity = Math.max(0, Math.min(1, parseFloat(params.backgroundOpacity) || 0.5));
   
   if (!['bottom', 'top', 'center'].includes(params.position)) {
     params.position = 'bottom';
@@ -121,7 +121,7 @@ function buildCustomStyle(styleParams) {
   }
   
   // Обрабатываем цвет фона
-  const backgroundInfo = parseBackgroundColor(params.background, params.backgroundTransparency);
+  const backgroundInfo = parseBackgroundColor(params.background, params.backgroundOpacity);
   if (backgroundInfo.enabled) {
     style.backcolour = backgroundInfo.ffmpegColor;
     style.borderstyle = 4;
@@ -134,10 +134,10 @@ function buildCustomStyle(styleParams) {
 }
 
 // 🎨 ФУНКЦИЯ ПАРСИНГА ЦВЕТА ФОНА С РАЗДЕЛЬНОЙ ПРОЗРАЧНОСТЬЮ
-function parseBackgroundColor(backgroundParam, transparencyParam) {
+function parseBackgroundColor(backgroundParam, opacityParam) {
   console.log(`[DEBUG] parseBackgroundColor called with:`);
   console.log(`[DEBUG]   backgroundParam: "${backgroundParam}" (type: ${typeof backgroundParam})`);
-  console.log(`[DEBUG]   transparencyParam: "${transparencyParam}" (type: ${typeof transparencyParam})`);
+  console.log(`[DEBUG]   opacityParam: "${opacityParam}" (type: ${typeof opacityParam})`);
   
   // Если пустая строка, null, undefined или false - отключаем фон
   if (!backgroundParam || backgroundParam === '' || backgroundParam === 'false') {
@@ -183,36 +183,38 @@ function parseBackgroundColor(backgroundParam, transparencyParam) {
   
   console.log(`[DEBUG] RGB components: R=${red}, G=${green}, B=${blue}`);
   
-  // Конвертируем прозрачность (0-1) в hex (00-FF)
-  const transparency = parseFloat(transparencyParam) || 0.5;
-  console.log(`[DEBUG] Raw transparency: "${transparencyParam}" -> parsed: ${transparency}`);
+  // Конвертируем opacity (0-1) в hex (00-FF)
+  // ВАЖНО: opacity где 0=прозрачный, 1=видимый (обратная логика от transparency)
+  const opacity = parseFloat(opacityParam) || 0.5;
+  console.log(`[DEBUG] Raw opacity: "${opacityParam}" -> parsed: ${opacity}`);
   
-  const alphaValue = Math.round(transparency * 255);
+  const alphaValue = Math.round(opacity * 255);
   const alpha = alphaValue.toString(16).padStart(2, '0').toUpperCase();
   
-  console.log(`[DEBUG] Alpha calculation: ${transparency} * 255 = ${alphaValue} -> hex: ${alpha}`);
+  console.log(`[DEBUG] Alpha calculation: ${opacity} * 255 = ${alphaValue} -> hex: ${alpha}`);
+  console.log(`[DEBUG] Opacity logic: ${opacity} opacity = ${Math.round(opacity * 100)}% visible`);
   
   // FFmpeg использует формат &HAABBGGRR (обратный порядок + альфа в начале)
   const ffmpegColor = `&H${alpha}${blue}${green}${red}`.toUpperCase();
   
   console.log(`[DEBUG] FFmpeg color format: &H${alpha}${blue}${green}${red} = ${ffmpegColor}`);
   
-  const transparencyPercent = Math.round(transparency * 100);
-  const description = `#${red}${green}${blue} (${transparencyPercent}% opacity)`;
+  const opacityPercent = Math.round(opacity * 100);
+  const description = `#${red}${green}${blue} (${opacityPercent}% visible)`;
   
   console.log(`[DEBUG] Final result:`);
   console.log(`[DEBUG]   enabled: true`);
   console.log(`[DEBUG]   ffmpegColor: ${ffmpegColor}`);
   console.log(`[DEBUG]   description: ${description}`);
   console.log(`[DEBUG]   originalColor: ${colorString}`);
-  console.log(`[DEBUG]   transparency: ${transparency}`);
+  console.log(`[DEBUG]   opacity: ${opacity}`);
   
   return {
     enabled: true,
     ffmpegColor: ffmpegColor,
     description: description,
     originalColor: colorString,
-    transparency: transparency
+    opacity: opacity
   };
 }
 
@@ -365,7 +367,7 @@ app.get('/health', (req, res) => {
       outline: 'boolean',
       position: 'string (bottom/top/center)',
       background: 'string (6-character hex color RRGGBB, or empty string for no background)',
-      backgroundTransparency: 'number (0-1, where 0=transparent, 1=opaque)'
+      backgroundOpacity: 'number (0-1, where 0=transparent, 1=opaque)'
     },
     endpoints: [
       '/process-video-stream (Custom styles - JSON response)',
@@ -502,7 +504,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
       outline: req.body.outline,
       position: req.body.position,
       background: req.body.background,
-      backgroundTransparency: req.body.backgroundTransparency
+      backgroundOpacity: req.body.backgroundOpacity
     };
     
     const forceQuality = req.body.force_quality || 'auto';
@@ -517,7 +519,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     console.log(`[${taskId}]   outline: "${styleParams.outline}" (type: ${typeof styleParams.outline})`);
     console.log(`[${taskId}]   position: "${styleParams.position}" (type: ${typeof styleParams.position})`);
     console.log(`[${taskId}]   background: "${styleParams.background}" (type: ${typeof styleParams.background})`);
-    console.log(`[${taskId}] 🔥 backgroundTransparency: "${styleParams.backgroundTransparency}" (type: ${typeof styleParams.backgroundTransparency})`);
+    console.log(`[${taskId}] 🔥 backgroundOpacity: "${styleParams.backgroundOpacity}" (type: ${typeof styleParams.backgroundOpacity})`);
     
     // 🎨 СОЗДАЕМ КАСТОМНЫЙ СТИЛЬ
     const { style: selectedStyle, description: styleDescription } = buildCustomStyle(styleParams);
@@ -760,7 +762,7 @@ const server = app.listen(PORT, () => {
   console.log(`   • bold (true/false) - Bold text`);
   console.log(`   • outline (true/false) - Text outline`);
   console.log(`   • background (RRGGBB) - Background color as 6-character hex`);
-  console.log(`   • backgroundTransparency (0-1) - Background opacity (0=transparent, 1=opaque)`);
+  console.log(`   • backgroundOpacity (0-1) - Background visibility (0=transparent, 1=opaque)`);
   console.log(`   • position (bottom/top/center) - Text position`);
   console.log(`🎯 Quality modes: auto | lossless | ultra | high | medium | low`);
   console.log(`🚀 Endpoints:`);
