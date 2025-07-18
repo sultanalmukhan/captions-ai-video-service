@@ -194,12 +194,19 @@ function parseBackgroundColor(backgroundParam) {
   // FFmpeg использует формат &HAABBGGRR (обратный порядок + альфа в начале)
   const ffmpegColor = `&H${alpha}${blue}${green}${red}`.toUpperCase();
   
+  // ИСПРАВЛЕНИЕ: Для черного цвета (000000) с полной непрозрачностью 
+  // FFmpeg может некорректно интерпретировать &HFF000000
+  // Используем небольшой трюк - делаем цвет чуть-чуть не черным (010101)
+  const correctedColor = (red === '00' && green === '00' && blue === '00' && alpha === 'FF') 
+    ? '&HFF010101'  // Почти черный, но видимый
+    : ffmpegColor;
+  
   const alphaPercent = Math.round((parseInt(alpha, 16) / 255) * 100);
   const description = `#${red}${green}${blue} (${alphaPercent}% opacity)`;
   
   return {
     enabled: true,
-    ffmpegColor: ffmpegColor,
+    ffmpegColor: correctedColor,
     description: description
   };
 }
