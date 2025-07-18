@@ -86,14 +86,25 @@ function buildCustomStyle(styleParams) {
   
   const params = { ...defaults, ...styleParams };
   
+  console.log(`[DEBUG] buildCustomStyle - incoming styleParams:`, styleParams);
+  console.log(`[DEBUG] buildCustomStyle - after applying defaults:`, params);
+  
   // Валидация параметров
   params.fontsize = Math.max(6, Math.min(12, parseInt(params.fontsize) || 8));
   params.fontcolor = (params.fontcolor || 'ffffff').replace('#', '').toLowerCase();
   params.bold = parseBooleanParam(params.bold);
   params.outline = parseBooleanParam(params.outline);
   
-  // Валидация backgroundOpacity (0-1, где 0=прозрачный, 1=видимый)
-  params.backgroundOpacity = Math.max(0, Math.min(1, parseFloat(params.backgroundOpacity) || 0.5));
+  // ИСПРАВЛЕНИЕ: НЕ перезаписываем backgroundOpacity если он уже есть
+  if (styleParams.backgroundOpacity !== undefined) {
+    // Используем ИСХОДНОЕ значение, не default
+    params.backgroundOpacity = Math.max(0, Math.min(1, parseFloat(styleParams.backgroundOpacity)));
+    console.log(`[DEBUG] buildCustomStyle - using original backgroundOpacity: "${styleParams.backgroundOpacity}" -> ${params.backgroundOpacity}`);
+  } else {
+    // Только если не задано - используем default
+    params.backgroundOpacity = 0.5;
+    console.log(`[DEBUG] buildCustomStyle - using default backgroundOpacity: 0.5`);
+  }
   
   if (!['bottom', 'top', 'center'].includes(params.position)) {
     params.position = 'bottom';
@@ -119,6 +130,8 @@ function buildCustomStyle(styleParams) {
     style.outline = 0;
     style.shadow = 0;
   }
+  
+  console.log(`[DEBUG] buildCustomStyle - before parseBackgroundColor: background="${params.background}", opacity=${params.backgroundOpacity}`);
   
   // Обрабатываем цвет фона
   const backgroundInfo = parseBackgroundColor(params.background, params.backgroundOpacity);
