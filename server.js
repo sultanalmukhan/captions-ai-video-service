@@ -169,8 +169,8 @@ function parseBackgroundColor(backgroundParam) {
   let alpha, red, green, blue;
   
   if (colorString.length === 6) {
-    // RRGGBB - добавляем полупрозрачность по умолчанию
-    alpha = '80'; // 50% прозрачность
+    // RRGGBB - добавляем ПОЛНУЮ НЕПРОЗРАЧНОСТЬ по умолчанию
+    alpha = 'FF'; // 100% непрозрачность вместо 80 (50%)
     red = colorString.substring(0, 2);
     green = colorString.substring(2, 4);
     blue = colorString.substring(4, 6);
