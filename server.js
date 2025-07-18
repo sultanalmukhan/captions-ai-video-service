@@ -120,9 +120,8 @@ function buildCustomStyle(styleParams) {
   const backgroundInfo = parseBackgroundColor(params.background);
   if (backgroundInfo.enabled) {
     style.backcolour = backgroundInfo.ffmpegColor;
-    // ИСПРАВЛЕНИЕ: Используем BorderStyle=4 для прямоугольного фона
-    // BorderStyle=3 создавал черный артефакт, BorderStyle=4 - чистый прямоугольник
-    style.borderstyle = 4;
+    // ЭКСПЕРИМЕНТ: Попробуем BorderStyle=3 (может быть он все-таки нужен)
+    style.borderstyle = 3;
   }
   
   return {
@@ -133,6 +132,8 @@ function buildCustomStyle(styleParams) {
 
 // 🎨 ФУНКЦИЯ ПАРСИНГА ЦВЕТА ФОНА
 function parseBackgroundColor(backgroundParam) {
+  console.log(`[DEBUG] parseBackgroundColor called with: "${backgroundParam}"`);
+  
   // Если пустая строка, null, undefined или false - отключаем фон
   if (!backgroundParam || backgroundParam === '' || backgroundParam === 'false') {
     return {
@@ -156,6 +157,8 @@ function parseBackgroundColor(backgroundParam) {
   // Убираем # если есть
   colorString = colorString.replace('#', '');
   
+  console.log(`[DEBUG] Processing color string: "${colorString}"`);
+  
   // Проверяем валидность hex
   if (!/^[0-9a-fA-F]{6}$|^[0-9a-fA-F]{8}$/.test(colorString)) {
     console.warn(`Invalid background color: ${backgroundParam}, using default black semi-transparent`);
@@ -169,11 +172,12 @@ function parseBackgroundColor(backgroundParam) {
   let alpha, red, green, blue;
   
   if (colorString.length === 6) {
-    // RRGGBB - добавляем полупрозрачность по умолчанию
-    alpha = '80'; // 50% прозрачность
+    // RRGGBB - добавляем ПОЛНУЮ НЕПРОЗРАЧНОСТЬ по умолчанию
+    alpha = 'FF'; // 100% непрозрачность вместо 80 (50%)
     red = colorString.substring(0, 2);
     green = colorString.substring(2, 4);
     blue = colorString.substring(4, 6);
+    console.log(`[DEBUG] 6-char color: R=${red}, G=${green}, B=${blue}, A=${alpha}`);
   } else {
     // AARRGGBB или RRGGBBAA
     if (isAlphaFirst(colorString)) {
@@ -182,25 +186,54 @@ function parseBackgroundColor(backgroundParam) {
       red = colorString.substring(2, 4);
       green = colorString.substring(4, 6);
       blue = colorString.substring(6, 8);
+      console.log(`[DEBUG] 8-char AARRGGBB: A=${alpha}, R=${red}, G=${green}, B=${blue}`);
     } else {
       // RRGGBBAA формат (более популярный)
       red = colorString.substring(0, 2);
       green = colorString.substring(2, 4);
       blue = colorString.substring(4, 6);
       alpha = colorString.substring(6, 8);
+      console.log(`[DEBUG] 8-char RRGGBBAA: R=${red}, G=${green}, B=${blue}, A=${alpha}`);
     }
   }
   
-  // FFmpeg использует формат &HAABBGGRR (обратный порядок + альфа в начале)
-  const ffmpegColor = `&H${alpha}${blue}${green}${red}`.toUpperCase();
+  // СПЕЦИАЛЬНАЯ ОБРАБОТКА ДЛЯ ЧЕРНОГО ЦВЕТА
+  let finalColor;
+  const isBlack = (red === '00' && green === '00' && blue === '00');
+  
+  if (isBlack && alpha === 'FF') {
+    console.log(`[DEBUG] SPECIAL: Pure black detected, trying multiple approaches`);
+    
+    // Попробуем несколько вариантов для черного цвета
+    const blackVariants = [
+      '&HFF010101', // Почти черный RGB(1,1,1)
+      '&HFF000001', // Почти черный RGB(0,0,1) 
+      '&HFF101010', // Темно-серый RGB(16,16,16)
+      '&HE0000000', // Черный с 88% непрозрачностью
+      '&HC0000000', // Черный с 75% непрозрачностью
+    ];
+    
+    finalColor = blackVariants[0]; // Используем первый вариант по умолчанию
+    console.log(`[DEBUG] Using black variant: ${finalColor}`);
+  } else {
+    // FFmpeg использует формат &HAABBGGRR (обратный порядок + альфа в начале)
+    finalColor = `&H${alpha}${blue}${green}${red}`.toUpperCase();
+    console.log(`[DEBUG] Standard color: ${finalColor}`);
+  }
   
   const alphaPercent = Math.round((parseInt(alpha, 16) / 255) * 100);
-  const description = `#${red}${green}${blue} (${alphaPercent}% opacity)`;
+  const description = isBlack ? 
+    `black variant (${alphaPercent}% opacity)` : 
+    `#${red}${green}${blue} (${alphaPercent}% opacity)`;
+  
+  console.log(`[DEBUG] Final result: enabled=true, color=${finalColor}, description="${description}"`);
   
   return {
     enabled: true,
-    ffmpegColor: ffmpegColor,
-    description: description
+    ffmpegColor: finalColor,
+    description: description,
+    isBlackVariant: isBlack,
+    originalHex: `${red}${green}${blue}${alpha}`
   };
 }
 
@@ -368,7 +401,8 @@ app.get('/health', (req, res) => {
       bold: 'boolean',
       outline: 'boolean',
       position: 'string (bottom/top/center)',
-      background: 'string (hex color with optional alpha: RRGGBB, RRGGBBAA, AARRGGBB or empty string for no background)'
+      background: 'string (6-character hex color RRGGBB, or empty string for no background)',
+      backgroundTransparency: 'number (0-1, where 0=transparent, 1=opaque)'
     },
     endpoints: [
       '/process-video-stream (Custom styles - JSON response)',
@@ -504,7 +538,8 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
       bold: req.body.bold,
       outline: req.body.outline,
       position: req.body.position,
-      background: req.body.background
+      background: req.body.background,
+      backgroundTransparency: req.body.backgroundTransparency
     };
     
     const forceQuality = req.body.force_quality || 'auto';
@@ -515,6 +550,9 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     // 🎨 СОЗДАЕМ КАСТОМНЫЙ СТИЛЬ
     const { style: selectedStyle, description: styleDescription } = buildCustomStyle(styleParams);
     console.log(`[${taskId}] Style: ${styleDescription}`);
+
+    // 🎨 ПОЛУЧАЕМ ИНФОРМАЦИЮ О ФОНЕ ДЛЯ ДАЛЬНЕЙШЕГО ИСПОЛЬЗОВАНИЯ
+    const backgroundInfo = parseBackgroundColor(styleParams.background);
 
     // Создаем временные файлы
     const tempDir = '/tmp/processing';
@@ -589,14 +627,111 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     // Строим FFmpeg команды с fallback логикой
     const mainCommand = `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${styleString}'" -c:a copy -c:v libx264 -preset ${optimalSettings.preset} -crf ${optimalSettings.crf} -pix_fmt yuv420p${optimalSettings.tune ? ` -tune ${optimalSettings.tune}` : ''} -profile:v ${optimalSettings.profile}${optimalSettings.level ? ` -level ${optimalSettings.level}` : ''} -movflags +faststart -y "${outputVideoPath}"`;
 
-    const simplifiedStyleString = `Fontname=DejaVu Sans,Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${selectedStyle.outline || 2}${selectedStyle.backcolour ? `,BackColour=${selectedStyle.backcolour},BorderStyle=4` : ''}`;
+    // Создаем массив команд
+    let commands = [mainCommand];
     
-    const commands = [
-      mainCommand,
+    // Если это черный фон, добавляем специальные fallback варианты с разными BorderStyle
+    if (selectedStyle.backcolour && backgroundInfo.isBlackVariant) {
+      console.log(`[${taskId}] Adding special black background fallbacks...`);
+      
+      const testCombinations = [
+        { color: '&HFF010101', border: 3, desc: 'Almost black + BorderStyle=3' },
+        { color: '&HFF010101', border: 4, desc: 'Almost black + BorderStyle=4' },
+        { color: '&HFF101010', border: 3, desc: 'Dark gray + BorderStyle=3' },
+        { color: '&HFF101010', border: 4, desc: 'Dark gray + BorderStyle=4' },
+        { color: '&HE0000000', border: 3, desc: 'Black 88% + BorderStyle=3' },
+        { color: '&HC0000000', border: 3, desc: 'Black 75% + BorderStyle=3' },
+        { color: '&H80000000', border: 3, desc: 'Black 50% + BorderStyle=3' },
+        { color: '&HFF202020', border: 3, desc: 'Very dark gray + BorderStyle=3' },
+      ];
+      
+      testCombinations.forEach((combo, index) => {
+        const testStyleString = styleString
+          .replace(selectedStyle.backcolour, combo.color)
+          .replace(/BorderStyle=\d+/, `BorderStyle=${combo.border}`);
+        const testCommand = `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${testStyleString}'" -c:a copy -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -movflags +faststart -y "${outputVideoPath}"`;
+        commands.push(testCommand);
+        console.log(`[${taskId}] Test ${index + 1}: ${combo.desc} -> ${combo.color},BorderStyle=${combo.border}`);
+      });
+    }
+
+    const simplifiedStyleString = `Fontname=DejaVu Sans,Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${selectedStyle.outline || 2}${selectedStyle.backcolour ? `,BackColour=${selectedStyle.backcolour},BorderStyle=3` : ''}`;
+    
+    // Добавляем стандартные fallback команды + эксперименты с фоном
+    commands.push(
       `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${styleString}'" -c:a copy -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -movflags +faststart -y "${outputVideoPath}"`,
-      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${simplifiedStyleString}'" -c:a copy -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -y "${outputVideoPath}"`,
+      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${simplifiedStyleString}'" -c:a copy -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -y "${outputVideoPath}"`
+    );
+    
+    // Добавляем эксперименты с BorderStyle для любого фона (не только черного)
+    if (selectedStyle.backcolour) {
+      console.log(`[${taskId}] Adding comprehensive background experiments...`);
+      
+      // Эксперимент 1: Попробуем совсем другой синтаксис для фона
+      const alternativeSyntaxTests = [
+        {
+          style: `Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor},BackColour=&H80000000,BorderStyle=3`,
+          desc: 'Simple black background test'
+        },
+        {
+          style: `Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor},BackColour=&HFF000000,BorderStyle=3`,
+          desc: 'Full black background test'
+        },
+        {
+          style: `Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor},BackColour=&H40808080,BorderStyle=3`,
+          desc: 'Gray background test'
+        },
+        {
+          style: `Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor},SecondaryColour=&H80000000,BorderStyle=3`,
+          desc: 'SecondaryColour instead of BackColour'
+        },
+        {
+          style: `Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor},BackColour=&H80000000,BorderStyle=4,Shadow=0`,
+          desc: 'Background with BorderStyle=4 and no shadow'
+        }
+      ];
+      
+      alternativeSyntaxTests.forEach((test, index) => {
+        const testCommand = `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${test.style}'" -c:a copy -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -y "${outputVideoPath}"`;
+        commands.push(testCommand);
+        console.log(`[${taskId}] Alternative ${index + 1}: ${test.desc}`);
+        console.log(`[${taskId}]   Style: ${test.style}`);
+      });
+      
+      // Эксперимент 2: Попробуем без Outline (может конфликтует)
+      const noOutlineTests = [
+        {
+          style: `Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor},BackColour=&H80000000,BorderStyle=3,Outline=0`,
+          desc: 'Background without outline'
+        },
+        {
+          style: `Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor},BackColour=&H80000000,BorderStyle=3,Outline=0,Shadow=0`,
+          desc: 'Background without outline and shadow'
+        }
+      ];
+      
+      noOutlineTests.forEach((test, index) => {
+        const testCommand = `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${test.style}'" -c:a copy -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -y "${outputVideoPath}"`;
+        commands.push(testCommand);
+        console.log(`[${taskId}] No-outline ${index + 1}: ${test.desc}`);
+      });
+      
+      // Эксперимент 3: Попробуем вообще другой подход через ASS стили
+      const assStyleTests = [
+        `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='BackColour=&H80000000,BorderStyle=3'" -c:a copy -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -y "${outputVideoPath}"`,
+        `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='Fontsize=8,BackColour=&H40FF0000,BorderStyle=3'" -c:a copy -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -y "${outputVideoPath}"` // Красный фон для теста
+      ];
+      
+      assStyleTests.forEach((testCommand, index) => {
+        commands.push(testCommand);
+        console.log(`[${taskId}] ASS-style ${index + 1}: ${index === 0 ? 'Black background only' : 'Red background test'}`);
+      });
+    }
+    
+    // Финальный fallback без кастомных стилей
+    commands.push(
       `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}'" -c:a copy -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -y "${outputVideoPath}"`
-    ];
+    );
 
     let success = false;
     let usedCommand = 0;
@@ -743,7 +878,8 @@ const server = app.listen(PORT, () => {
   console.log(`   • fontcolor (hex) - Text color`);
   console.log(`   • bold (true/false) - Bold text`);
   console.log(`   • outline (true/false) - Text outline`);
-  console.log(`   • background (hex color) - Background color with alpha (RRGGBB, RRGGBBAA, AARRGGBB, or empty for none)`);
+  console.log(`   • background (RRGGBB) - Background color as 6-character hex`);
+  console.log(`   • backgroundTransparency (0-1) - Background opacity (0=transparent, 1=opaque)`);
   console.log(`   • position (bottom/top/center) - Text position`);
   console.log(`🎯 Quality modes: auto | lossless | ultra | high | medium | low`);
   console.log(`🚀 Endpoints:`);
