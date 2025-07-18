@@ -663,20 +663,66 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     
     // Добавляем эксперименты с BorderStyle для любого фона (не только черного)
     if (selectedStyle.backcolour) {
-      console.log(`[${taskId}] Adding BorderStyle experiments for background...`);
+      console.log(`[${taskId}] Adding comprehensive background experiments...`);
       
-      const borderStyleTests = [
-        { style: 1, desc: 'BorderStyle=1 (outline only)' },
-        { style: 2, desc: 'BorderStyle=2 (unknown)' },
-        { style: 3, desc: 'BorderStyle=3 (opaque background)' },
-        { style: 4, desc: 'BorderStyle=4 (transparent background)' },
+      // Эксперимент 1: Попробуем совсем другой синтаксис для фона
+      const alternativeSyntaxTests = [
+        {
+          style: `Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor},BackColour=&H80000000,BorderStyle=3`,
+          desc: 'Simple black background test'
+        },
+        {
+          style: `Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor},BackColour=&HFF000000,BorderStyle=3`,
+          desc: 'Full black background test'
+        },
+        {
+          style: `Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor},BackColour=&H40808080,BorderStyle=3`,
+          desc: 'Gray background test'
+        },
+        {
+          style: `Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor},SecondaryColour=&H80000000,BorderStyle=3`,
+          desc: 'SecondaryColour instead of BackColour'
+        },
+        {
+          style: `Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor},BackColour=&H80000000,BorderStyle=4,Shadow=0`,
+          desc: 'Background with BorderStyle=4 and no shadow'
+        }
       ];
       
-      borderStyleTests.forEach((test, index) => {
-        const testStyle = styleString.replace(/BorderStyle=\d+/, `BorderStyle=${test.style}`);
-        const testCommand = `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${testStyle}'" -c:a copy -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -y "${outputVideoPath}"`;
+      alternativeSyntaxTests.forEach((test, index) => {
+        const testCommand = `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${test.style}'" -c:a copy -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -y "${outputVideoPath}"`;
         commands.push(testCommand);
-        console.log(`[${taskId}] BorderStyle test ${index + 1}: ${test.desc}`);
+        console.log(`[${taskId}] Alternative ${index + 1}: ${test.desc}`);
+        console.log(`[${taskId}]   Style: ${test.style}`);
+      });
+      
+      // Эксперимент 2: Попробуем без Outline (может конфликтует)
+      const noOutlineTests = [
+        {
+          style: `Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor},BackColour=&H80000000,BorderStyle=3,Outline=0`,
+          desc: 'Background without outline'
+        },
+        {
+          style: `Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor},BackColour=&H80000000,BorderStyle=3,Outline=0,Shadow=0`,
+          desc: 'Background without outline and shadow'
+        }
+      ];
+      
+      noOutlineTests.forEach((test, index) => {
+        const testCommand = `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${test.style}'" -c:a copy -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -y "${outputVideoPath}"`;
+        commands.push(testCommand);
+        console.log(`[${taskId}] No-outline ${index + 1}: ${test.desc}`);
+      });
+      
+      // Эксперимент 3: Попробуем вообще другой подход через ASS стили
+      const assStyleTests = [
+        `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='BackColour=&H80000000,BorderStyle=3'" -c:a copy -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -y "${outputVideoPath}"`,
+        `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='Fontsize=8,BackColour=&H40FF0000,BorderStyle=3'" -c:a copy -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -y "${outputVideoPath}"` // Красный фон для теста
+      ];
+      
+      assStyleTests.forEach((testCommand, index) => {
+        commands.push(testCommand);
+        console.log(`[${taskId}] ASS-style ${index + 1}: ${index === 0 ? 'Black background only' : 'Red background test'}`);
       });
     }
     
