@@ -80,7 +80,7 @@ function buildCustomStyle(styleParams) {
     bold: false,
     outline: true,
     position: 'bottom',
-    background: false
+    background: ''
   };
   
   const params = { ...defaults, ...styleParams };
@@ -90,7 +90,6 @@ function buildCustomStyle(styleParams) {
   params.fontcolor = (params.fontcolor || 'ffffff').replace('#', '').toLowerCase();
   params.bold = parseBooleanParam(params.bold);
   params.outline = parseBooleanParam(params.outline);
-  params.background = parseBooleanParam(params.background);
   
   if (!['bottom', 'top', 'center'].includes(params.position)) {
     params.position = 'bottom';
@@ -117,16 +116,106 @@ function buildCustomStyle(styleParams) {
     style.shadow = 0;
   }
   
-  // Добавляем фон
-  if (params.background) {
-    style.backcolour = '&H80000000';  // Черный с 50% прозрачностью
+  // Обрабатываем цвет фона
+  const backgroundInfo = parseBackgroundColor(params.background);
+  if (backgroundInfo.enabled) {
+    style.backcolour = backgroundInfo.ffmpegColor;
     style.borderstyle = 3;  // Важно для работы фона
   }
   
   return {
     style,
-    description: `Custom style: ${params.fontsize}px, ${params.fontcolor}, ${params.position}, outline: ${params.outline}, bg: ${params.background}, bold: ${params.bold}`
+    description: `Custom style: ${params.fontsize}px, ${params.fontcolor}, ${params.position}, outline: ${params.outline}, bg: ${backgroundInfo.description}, bold: ${params.bold}`
   };
+}
+
+// 🎨 ФУНКЦИЯ ПАРСИНГА ЦВЕТА ФОНА
+function parseBackgroundColor(backgroundParam) {
+  // Если пустая строка, null, undefined или false - отключаем фон
+  if (!backgroundParam || backgroundParam === '' || backgroundParam === 'false') {
+    return {
+      enabled: false,
+      ffmpegColor: null,
+      description: 'none'
+    };
+  }
+  
+  // Для обратной совместимости: если передали true или "true" - используем черный полупрозрачный
+  if (backgroundParam === true || backgroundParam === 'true') {
+    return {
+      enabled: true,
+      ffmpegColor: '&H80000000',
+      description: 'black semi-transparent'
+    };
+  }
+  
+  let colorString = String(backgroundParam).trim();
+  
+  // Убираем # если есть
+  colorString = colorString.replace('#', '');
+  
+  // Проверяем валидность hex
+  if (!/^[0-9a-fA-F]{6}$|^[0-9a-fA-F]{8}$/.test(colorString)) {
+    console.warn(`Invalid background color: ${backgroundParam}, using default black semi-transparent`);
+    return {
+      enabled: true,
+      ffmpegColor: '&H80000000',
+      description: 'black semi-transparent (fallback)'
+    };
+  }
+  
+  let alpha, red, green, blue;
+  
+  if (colorString.length === 6) {
+    // RRGGBB - добавляем полупрозрачность по умолчанию
+    alpha = '80'; // 50% прозрачность
+    red = colorString.substring(0, 2);
+    green = colorString.substring(2, 4);
+    blue = colorString.substring(4, 6);
+  } else {
+    // AARRGGBB или RRGGBBAA
+    if (isAlphaFirst(colorString)) {
+      // AARRGGBB формат
+      alpha = colorString.substring(0, 2);
+      red = colorString.substring(2, 4);
+      green = colorString.substring(4, 6);
+      blue = colorString.substring(6, 8);
+    } else {
+      // RRGGBBAA формат (более популярный)
+      red = colorString.substring(0, 2);
+      green = colorString.substring(2, 4);
+      blue = colorString.substring(4, 6);
+      alpha = colorString.substring(6, 8);
+    }
+  }
+  
+  // FFmpeg использует формат &HAABBGGRR (обратный порядок + альфа в начале)
+  const ffmpegColor = `&H${alpha}${blue}${green}${red}`.toUpperCase();
+  
+  const alphaPercent = Math.round((parseInt(alpha, 16) / 255) * 100);
+  const description = `#${red}${green}${blue} (${alphaPercent}% opacity)`;
+  
+  return {
+    enabled: true,
+    ffmpegColor: ffmpegColor,
+    description: description
+  };
+}
+
+// 🔧 HELPER ФУНКЦИЯ ДЛЯ ОПРЕДЕЛЕНИЯ ФОРМАТА АЛЬФЫ
+function isAlphaFirst(colorString) {
+  // Простая эвристика: если первые два символа дают значение > 128 в hex,
+  // вероятно это альфа канал в начале (обычно высокие значения для видимости)
+  const firstTwo = parseInt(colorString.substring(0, 2), 16);
+  const lastTwo = parseInt(colorString.substring(6, 8), 16);
+  
+  // Если первые два символа больше 128 (80 в hex), скорее всего это альфа
+  // Если последние два больше 128, скорее всего альфа в конце
+  if (firstTwo > 128 && lastTwo <= 128) return true;
+  if (lastTwo > 128 && firstTwo <= 128) return false;
+  
+  // По умолчанию считаем что альфа в конце (RRGGBBAA)
+  return false;
 }
 
 // 🔧 HELPER ФУНКЦИЯ ДЛЯ ПАРСИНГА BOOLEAN ПАРАМЕТРОВ
@@ -277,7 +366,7 @@ app.get('/health', (req, res) => {
       bold: 'boolean',
       outline: 'boolean',
       position: 'string (bottom/top/center)',
-      background: 'boolean'
+      background: 'string (hex color with optional alpha: RRGGBB, RRGGBBAA, AARRGGBB or empty string for no background)'
     },
     endpoints: [
       '/process-video-stream (Custom styles - JSON response)',
@@ -651,7 +740,7 @@ const server = app.listen(PORT, () => {
   console.log(`   • fontcolor (hex) - Text color`);
   console.log(`   • bold (true/false) - Bold text`);
   console.log(`   • outline (true/false) - Text outline`);
-  console.log(`   • background (true/false) - Black transparent background`);
+  console.log(`   • background (hex color) - Background color with alpha (RRGGBB, RRGGBBAA, AARRGGBB, or empty for none)`);
   console.log(`   • position (bottom/top/center) - Text position`);
   console.log(`🎯 Quality modes: auto | lossless | ultra | high | medium | low`);
   console.log(`🚀 Endpoints:`);
