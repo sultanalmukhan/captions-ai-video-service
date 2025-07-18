@@ -1,5 +1,5 @@
 // Beautiful Railway Service с кастомными стилями + МАКСИМАЛЬНОЕ КАЧЕСТВО + STREAMING
-// server.js - Custom subtitle styles + NO COMPRESSION + NO TIMEOUT - PRODUCTION
+// server.js - Custom subtitle styles + NO COMPRESSION + NO TIMEOUT - PRODUCTION WITH SEPARATE BACKGROUND TRANSPARENCY
 
 const express = require('express');
 const multer = require('multer');
@@ -80,7 +80,8 @@ function buildCustomStyle(styleParams) {
     bold: false,
     outline: true,
     position: 'bottom',
-    background: ''
+    background: '',
+    backgroundTransparency: 0.5
   };
   
   const params = { ...defaults, ...styleParams };
@@ -90,6 +91,9 @@ function buildCustomStyle(styleParams) {
   params.fontcolor = (params.fontcolor || 'ffffff').replace('#', '').toLowerCase();
   params.bold = parseBooleanParam(params.bold);
   params.outline = parseBooleanParam(params.outline);
+  
+  // Валидация backgroundTransparency (0-1)
+  params.backgroundTransparency = Math.max(0, Math.min(1, parseFloat(params.backgroundTransparency) || 0.5));
   
   if (!['bottom', 'top', 'center'].includes(params.position)) {
     params.position = 'bottom';
@@ -117,11 +121,10 @@ function buildCustomStyle(styleParams) {
   }
   
   // Обрабатываем цвет фона
-  const backgroundInfo = parseBackgroundColor(params.background);
+  const backgroundInfo = parseBackgroundColor(params.background, params.backgroundTransparency);
   if (backgroundInfo.enabled) {
     style.backcolour = backgroundInfo.ffmpegColor;
-    // ЭКСПЕРИМЕНТ: Попробуем BorderStyle=3 (может быть он все-таки нужен)
-    style.borderstyle = 3;
+    style.borderstyle = 4;
   }
   
   return {
@@ -130,12 +133,15 @@ function buildCustomStyle(styleParams) {
   };
 }
 
-// 🎨 ФУНКЦИЯ ПАРСИНГА ЦВЕТА ФОНА
-function parseBackgroundColor(backgroundParam) {
-  console.log(`[DEBUG] parseBackgroundColor called with: "${backgroundParam}"`);
+// 🎨 ФУНКЦИЯ ПАРСИНГА ЦВЕТА ФОНА С РАЗДЕЛЬНОЙ ПРОЗРАЧНОСТЬЮ
+function parseBackgroundColor(backgroundParam, transparencyParam) {
+  console.log(`[DEBUG] parseBackgroundColor called with:`);
+  console.log(`[DEBUG]   backgroundParam: "${backgroundParam}" (type: ${typeof backgroundParam})`);
+  console.log(`[DEBUG]   transparencyParam: "${transparencyParam}" (type: ${typeof transparencyParam})`);
   
   // Если пустая строка, null, undefined или false - отключаем фон
   if (!backgroundParam || backgroundParam === '' || backgroundParam === 'false') {
+    console.log(`[DEBUG] Background disabled (empty or false)`);
     return {
       enabled: false,
       ffmpegColor: null,
@@ -145,6 +151,7 @@ function parseBackgroundColor(backgroundParam) {
   
   // Для обратной совместимости: если передали true или "true" - используем черный полупрозрачный
   if (backgroundParam === true || backgroundParam === 'true') {
+    console.log(`[DEBUG] Using legacy true value`);
     return {
       enabled: true,
       ffmpegColor: '&H80000000',
@@ -157,100 +164,56 @@ function parseBackgroundColor(backgroundParam) {
   // Убираем # если есть
   colorString = colorString.replace('#', '');
   
-  console.log(`[DEBUG] Processing color string: "${colorString}"`);
+  console.log(`[DEBUG] Processed color string: "${colorString}"`);
   
-  // Проверяем валидность hex
-  if (!/^[0-9a-fA-F]{6}$|^[0-9a-fA-F]{8}$/.test(colorString)) {
-    console.warn(`Invalid background color: ${backgroundParam}, using default black semi-transparent`);
+  // НОВАЯ ЛОГИКА: Проверяем что это именно 6-символьный hex
+  if (!/^[0-9a-fA-F]{6}$/.test(colorString)) {
+    console.warn(`[DEBUG] Invalid background color: ${backgroundParam}, expected 6-character hex (RRGGBB)`);
     return {
-      enabled: true,
-      ffmpegColor: '&H80000000',
-      description: 'black semi-transparent (fallback)'
+      enabled: false,
+      ffmpegColor: null,
+      description: 'invalid color format'
     };
   }
   
-  let alpha, red, green, blue;
+  // Извлекаем RGB компоненты
+  const red = colorString.substring(0, 2);
+  const green = colorString.substring(2, 4);
+  const blue = colorString.substring(4, 6);
   
-  if (colorString.length === 6) {
-    // RRGGBB - добавляем ПОЛНУЮ НЕПРОЗРАЧНОСТЬ по умолчанию
-    alpha = 'FF'; // 100% непрозрачность вместо 80 (50%)
-    red = colorString.substring(0, 2);
-    green = colorString.substring(2, 4);
-    blue = colorString.substring(4, 6);
-    console.log(`[DEBUG] 6-char color: R=${red}, G=${green}, B=${blue}, A=${alpha}`);
-  } else {
-    // AARRGGBB или RRGGBBAA
-    if (isAlphaFirst(colorString)) {
-      // AARRGGBB формат
-      alpha = colorString.substring(0, 2);
-      red = colorString.substring(2, 4);
-      green = colorString.substring(4, 6);
-      blue = colorString.substring(6, 8);
-      console.log(`[DEBUG] 8-char AARRGGBB: A=${alpha}, R=${red}, G=${green}, B=${blue}`);
-    } else {
-      // RRGGBBAA формат (более популярный)
-      red = colorString.substring(0, 2);
-      green = colorString.substring(2, 4);
-      blue = colorString.substring(4, 6);
-      alpha = colorString.substring(6, 8);
-      console.log(`[DEBUG] 8-char RRGGBBAA: R=${red}, G=${green}, B=${blue}, A=${alpha}`);
-    }
-  }
+  console.log(`[DEBUG] RGB components: R=${red}, G=${green}, B=${blue}`);
   
-  // СПЕЦИАЛЬНАЯ ОБРАБОТКА ДЛЯ ЧЕРНОГО ЦВЕТА
-  let finalColor;
-  const isBlack = (red === '00' && green === '00' && blue === '00');
+  // Конвертируем прозрачность (0-1) в hex (00-FF)
+  const transparency = parseFloat(transparencyParam) || 0.5;
+  console.log(`[DEBUG] Raw transparency: "${transparencyParam}" -> parsed: ${transparency}`);
   
-  if (isBlack && alpha === 'FF') {
-    console.log(`[DEBUG] SPECIAL: Pure black detected, trying multiple approaches`);
-    
-    // Попробуем несколько вариантов для черного цвета
-    const blackVariants = [
-      '&HFF010101', // Почти черный RGB(1,1,1)
-      '&HFF000001', // Почти черный RGB(0,0,1) 
-      '&HFF101010', // Темно-серый RGB(16,16,16)
-      '&HE0000000', // Черный с 88% непрозрачностью
-      '&HC0000000', // Черный с 75% непрозрачностью
-    ];
-    
-    finalColor = blackVariants[0]; // Используем первый вариант по умолчанию
-    console.log(`[DEBUG] Using black variant: ${finalColor}`);
-  } else {
-    // FFmpeg использует формат &HAABBGGRR (обратный порядок + альфа в начале)
-    finalColor = `&H${alpha}${blue}${green}${red}`.toUpperCase();
-    console.log(`[DEBUG] Standard color: ${finalColor}`);
-  }
+  const alphaValue = Math.round(transparency * 255);
+  const alpha = alphaValue.toString(16).padStart(2, '0').toUpperCase();
   
-  const alphaPercent = Math.round((parseInt(alpha, 16) / 255) * 100);
-  const description = isBlack ? 
-    `black variant (${alphaPercent}% opacity)` : 
-    `#${red}${green}${blue} (${alphaPercent}% opacity)`;
+  console.log(`[DEBUG] Alpha calculation: ${transparency} * 255 = ${alphaValue} -> hex: ${alpha}`);
   
-  console.log(`[DEBUG] Final result: enabled=true, color=${finalColor}, description="${description}"`);
+  // FFmpeg использует формат &HAABBGGRR (обратный порядок + альфа в начале)
+  const ffmpegColor = `&H${alpha}${blue}${green}${red}`.toUpperCase();
+  
+  console.log(`[DEBUG] FFmpeg color format: &H${alpha}${blue}${green}${red} = ${ffmpegColor}`);
+  
+  const transparencyPercent = Math.round(transparency * 100);
+  const description = `#${red}${green}${blue} (${transparencyPercent}% opacity)`;
+  
+  console.log(`[DEBUG] Final result:`);
+  console.log(`[DEBUG]   enabled: true`);
+  console.log(`[DEBUG]   ffmpegColor: ${ffmpegColor}`);
+  console.log(`[DEBUG]   description: ${description}`);
+  console.log(`[DEBUG]   originalColor: ${colorString}`);
+  console.log(`[DEBUG]   transparency: ${transparency}`);
   
   return {
     enabled: true,
-    ffmpegColor: finalColor,
+    ffmpegColor: ffmpegColor,
     description: description,
-    isBlackVariant: isBlack,
-    originalHex: `${red}${green}${blue}${alpha}`
+    originalColor: colorString,
+    transparency: transparency
   };
-}
-
-// 🔧 HELPER ФУНКЦИЯ ДЛЯ ОПРЕДЕЛЕНИЯ ФОРМАТА АЛЬФЫ
-function isAlphaFirst(colorString) {
-  // Простая эвристика: если первые два символа дают значение > 128 в hex,
-  // вероятно это альфа канал в начале (обычно высокие значения для видимости)
-  const firstTwo = parseInt(colorString.substring(0, 2), 16);
-  const lastTwo = parseInt(colorString.substring(6, 8), 16);
-  
-  // Если первые два символа больше 128 (80 в hex), скорее всего это альфа
-  // Если последние два больше 128, скорее всего альфа в конце
-  if (firstTwo > 128 && lastTwo <= 128) return true;
-  if (lastTwo > 128 && firstTwo <= 128) return false;
-  
-  // По умолчанию считаем что альфа в конце (RRGGBBAA)
-  return false;
 }
 
 // 🔧 HELPER ФУНКЦИЯ ДЛЯ ПАРСИНГА BOOLEAN ПАРАМЕТРОВ
@@ -390,8 +353,8 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'healthy', 
     timestamp: new Date().toISOString(),
-    mode: 'CUSTOM_STYLES_WITH_MAXIMUM_QUALITY_STREAMING',
-    style_system: 'CUSTOM_PARAMETERS_ONLY',
+    mode: 'CUSTOM_STYLES_WITH_MAXIMUM_QUALITY_STREAMING_SEPARATE_TRANSPARENCY',
+    style_system: 'CUSTOM_PARAMETERS_WITH_SEPARATE_BACKGROUND_TRANSPARENCY',
     available_fonts: AVAILABLE_FONTS,
     available_positions: Object.keys(SUBTITLE_POSITIONS),
     quality_mode: 'NO_COMPRESSION_MAXIMUM_QUALITY_STREAMING_ENABLED',
@@ -560,9 +523,6 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     const { style: selectedStyle, description: styleDescription } = buildCustomStyle(styleParams);
     console.log(`[${taskId}] Style: ${styleDescription}`);
 
-    // 🎨 ПОЛУЧАЕМ ИНФОРМАЦИЮ О ФОНЕ ДЛЯ ДАЛЬНЕЙШЕГО ИСПОЛЬЗОВАНИЯ
-    const backgroundInfo = parseBackgroundColor(styleParams.background);
-
     // Создаем временные файлы
     const tempDir = '/tmp/processing';
     if (!fs.existsSync(tempDir)) {
@@ -622,7 +582,6 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
       
       if (style.backcolour) {
         styleStr += `,BackColour=${style.backcolour}`;
-        // ИСПРАВЛЕНИЕ: BorderStyle=4 для чистого прямоугольного фона
         if (style.borderstyle) {
           styleStr += `,BorderStyle=${style.borderstyle}`;
         }
@@ -647,111 +606,14 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     // Строим FFmpeg команды с fallback логикой
     const mainCommand = `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${styleString}'" -c:a copy -c:v libx264 -preset ${optimalSettings.preset} -crf ${optimalSettings.crf} -pix_fmt yuv420p${optimalSettings.tune ? ` -tune ${optimalSettings.tune}` : ''} -profile:v ${optimalSettings.profile}${optimalSettings.level ? ` -level ${optimalSettings.level}` : ''} -movflags +faststart -y "${outputVideoPath}"`;
 
-    // Создаем массив команд
-    let commands = [mainCommand];
+    const simplifiedStyleString = `Fontname=DejaVu Sans,Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${selectedStyle.outline || 2}${selectedStyle.backcolour ? `,BackColour=${selectedStyle.backcolour},BorderStyle=4` : ''}`;
     
-    // Если это черный фон, добавляем специальные fallback варианты с разными BorderStyle
-    if (selectedStyle.backcolour && backgroundInfo.isBlackVariant) {
-      console.log(`[${taskId}] Adding special black background fallbacks...`);
-      
-      const testCombinations = [
-        { color: '&HFF010101', border: 3, desc: 'Almost black + BorderStyle=3' },
-        { color: '&HFF010101', border: 4, desc: 'Almost black + BorderStyle=4' },
-        { color: '&HFF101010', border: 3, desc: 'Dark gray + BorderStyle=3' },
-        { color: '&HFF101010', border: 4, desc: 'Dark gray + BorderStyle=4' },
-        { color: '&HE0000000', border: 3, desc: 'Black 88% + BorderStyle=3' },
-        { color: '&HC0000000', border: 3, desc: 'Black 75% + BorderStyle=3' },
-        { color: '&H80000000', border: 3, desc: 'Black 50% + BorderStyle=3' },
-        { color: '&HFF202020', border: 3, desc: 'Very dark gray + BorderStyle=3' },
-      ];
-      
-      testCombinations.forEach((combo, index) => {
-        const testStyleString = styleString
-          .replace(selectedStyle.backcolour, combo.color)
-          .replace(/BorderStyle=\d+/, `BorderStyle=${combo.border}`);
-        const testCommand = `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${testStyleString}'" -c:a copy -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -movflags +faststart -y "${outputVideoPath}"`;
-        commands.push(testCommand);
-        console.log(`[${taskId}] Test ${index + 1}: ${combo.desc} -> ${combo.color},BorderStyle=${combo.border}`);
-      });
-    }
-
-    const simplifiedStyleString = `Fontname=DejaVu Sans,Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${selectedStyle.outline || 2}${selectedStyle.backcolour ? `,BackColour=${selectedStyle.backcolour},BorderStyle=3` : ''}`;
-    
-    // Добавляем стандартные fallback команды + эксперименты с фоном
-    commands.push(
+    const commands = [
+      mainCommand,
       `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${styleString}'" -c:a copy -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -movflags +faststart -y "${outputVideoPath}"`,
-      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${simplifiedStyleString}'" -c:a copy -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -y "${outputVideoPath}"`
-    );
-    
-    // Добавляем эксперименты с BorderStyle для любого фона (не только черного)
-    if (selectedStyle.backcolour) {
-      console.log(`[${taskId}] Adding comprehensive background experiments...`);
-      
-      // Эксперимент 1: Попробуем совсем другой синтаксис для фона
-      const alternativeSyntaxTests = [
-        {
-          style: `Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor},BackColour=&H80000000,BorderStyle=3`,
-          desc: 'Simple black background test'
-        },
-        {
-          style: `Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor},BackColour=&HFF000000,BorderStyle=3`,
-          desc: 'Full black background test'
-        },
-        {
-          style: `Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor},BackColour=&H40808080,BorderStyle=3`,
-          desc: 'Gray background test'
-        },
-        {
-          style: `Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor},SecondaryColour=&H80000000,BorderStyle=3`,
-          desc: 'SecondaryColour instead of BackColour'
-        },
-        {
-          style: `Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor},BackColour=&H80000000,BorderStyle=4,Shadow=0`,
-          desc: 'Background with BorderStyle=4 and no shadow'
-        }
-      ];
-      
-      alternativeSyntaxTests.forEach((test, index) => {
-        const testCommand = `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${test.style}'" -c:a copy -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -y "${outputVideoPath}"`;
-        commands.push(testCommand);
-        console.log(`[${taskId}] Alternative ${index + 1}: ${test.desc}`);
-        console.log(`[${taskId}]   Style: ${test.style}`);
-      });
-      
-      // Эксперимент 2: Попробуем без Outline (может конфликтует)
-      const noOutlineTests = [
-        {
-          style: `Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor},BackColour=&H80000000,BorderStyle=3,Outline=0`,
-          desc: 'Background without outline'
-        },
-        {
-          style: `Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor},BackColour=&H80000000,BorderStyle=3,Outline=0,Shadow=0`,
-          desc: 'Background without outline and shadow'
-        }
-      ];
-      
-      noOutlineTests.forEach((test, index) => {
-        const testCommand = `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${test.style}'" -c:a copy -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -y "${outputVideoPath}"`;
-        commands.push(testCommand);
-        console.log(`[${taskId}] No-outline ${index + 1}: ${test.desc}`);
-      });
-      
-      // Эксперимент 3: Попробуем вообще другой подход через ASS стили
-      const assStyleTests = [
-        `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='BackColour=&H80000000,BorderStyle=3'" -c:a copy -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -y "${outputVideoPath}"`,
-        `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='Fontsize=8,BackColour=&H40FF0000,BorderStyle=3'" -c:a copy -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -y "${outputVideoPath}"` // Красный фон для теста
-      ];
-      
-      assStyleTests.forEach((testCommand, index) => {
-        commands.push(testCommand);
-        console.log(`[${taskId}] ASS-style ${index + 1}: ${index === 0 ? 'Black background only' : 'Red background test'}`);
-      });
-    }
-    
-    // Финальный fallback без кастомных стилей
-    commands.push(
+      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${simplifiedStyleString}'" -c:a copy -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -y "${outputVideoPath}"`,
       `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}'" -c:a copy -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -y "${outputVideoPath}"`
-    );
+    ];
 
     let success = false;
     let usedCommand = 0;
@@ -839,7 +701,6 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
         original_size_bytes: processedVideoBuffer.length,
         base64_length: base64Data.length,
         expected_decoded_size: Math.ceil(base64Data.length * 3 / 4),
-        file_signature: processedVideoBuffer.slice(0, 12).toString('hex'),
         is_valid_mp4: isValidMP4,
         content_type: 'video/mp4',
         encoding: 'base64'
@@ -892,7 +753,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
 const server = app.listen(PORT, () => {
   console.log(`🎨 CUSTOM STYLE Subtitle Service running on port ${PORT}`);
   console.log(`📱 Ready for custom subtitle styles with MAXIMUM QUALITY!`);
-  console.log(`🎯 Style system: CUSTOM_PARAMETERS_ONLY`);
+  console.log(`🎯 Style system: CUSTOM_PARAMETERS_WITH_SEPARATE_BACKGROUND_TRANSPARENCY`);
   console.log(`✨ Available parameters:`);
   console.log(`   • fontsize (6-12) - Text size`);
   console.log(`   • fontcolor (hex) - Text color`);
@@ -908,7 +769,7 @@ const server = app.listen(PORT, () => {
   
   const systemInfo = getSystemInfo();
   console.log(`FFmpeg: ${systemInfo.ffmpeg_available}`);
-  console.log(`Quality Mode: CUSTOM_STYLES_WITH_MP4_VERIFICATION`);
+  console.log(`Quality Mode: CUSTOM_STYLES_WITH_MP4_VERIFICATION_SEPARATE_TRANSPARENCY`);
 });
 
 // Увеличиваем timeout сервера
