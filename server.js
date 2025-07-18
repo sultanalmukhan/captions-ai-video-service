@@ -120,8 +120,9 @@ function buildCustomStyle(styleParams) {
   const backgroundInfo = parseBackgroundColor(params.background);
   if (backgroundInfo.enabled) {
     style.backcolour = backgroundInfo.ffmpegColor;
-    // ИСПРАВЛЕНИЕ: НЕ добавляем BorderStyle=3, это вызывает черный прямоугольник
-    // style.borderstyle = 3;  // Убираем эту строку!
+    // ИСПРАВЛЕНИЕ: Используем BorderStyle=4 для прямоугольного фона
+    // BorderStyle=3 создавал черный артефакт, BorderStyle=4 - чистый прямоугольник
+    style.borderstyle = 4;
   }
   
   return {
@@ -574,10 +575,10 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
       
       if (style.backcolour) {
         styleStr += `,BackColour=${style.backcolour}`;
-        // ИСПРАВЛЕНИЕ: НЕ добавляем BorderStyle - это создает черный прямоугольник
-        // if (style.borderstyle) {
-        //   styleStr += `,BorderStyle=${style.borderstyle}`;
-        // }
+        // ИСПРАВЛЕНИЕ: BorderStyle=4 для чистого прямоугольного фона
+        if (style.borderstyle) {
+          styleStr += `,BorderStyle=${style.borderstyle}`;
+        }
       }
       
       return styleStr;
@@ -588,7 +589,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     // Строим FFmpeg команды с fallback логикой
     const mainCommand = `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${styleString}'" -c:a copy -c:v libx264 -preset ${optimalSettings.preset} -crf ${optimalSettings.crf} -pix_fmt yuv420p${optimalSettings.tune ? ` -tune ${optimalSettings.tune}` : ''} -profile:v ${optimalSettings.profile}${optimalSettings.level ? ` -level ${optimalSettings.level}` : ''} -movflags +faststart -y "${outputVideoPath}"`;
 
-    const simplifiedStyleString = `Fontname=DejaVu Sans,Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${selectedStyle.outline || 2}${selectedStyle.backcolour ? `,BackColour=${selectedStyle.backcolour}` : ''}`;
+    const simplifiedStyleString = `Fontname=DejaVu Sans,Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${selectedStyle.outline || 2}${selectedStyle.backcolour ? `,BackColour=${selectedStyle.backcolour},BorderStyle=4` : ''}`;
     
     const commands = [
       mainCommand,
