@@ -1,5 +1,5 @@
 // Beautiful Railway Service с кастомными стилями + МАКСИМАЛЬНОЕ КАЧЕСТВО + STREAMING
-// server.js - Custom subtitle styles + NO COMPRESSION + NO TIMEOUT
+// server.js - Custom subtitle styles + NO COMPRESSION + NO TIMEOUT + BACKGROUND DEBUG
 
 const express = require('express');
 const multer = require('multer');
@@ -142,12 +142,34 @@ function buildCustomStyle(styleParams) {
     console.log(`[DEBUG] ❌ OUTLINE DISABLED: outline=0, shadow=0`);
   }
   
-  // Добавляем фон если включен
+  // 🔥 ДОБАВЛЯЕМ ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ ДЛЯ ФОНА
+  console.log(`[DEBUG] 🎨 BACKGROUND PROCESSING START:`);
+  console.log(`[DEBUG] 🎨   params.background value: "${params.background}"`);
+  console.log(`[DEBUG] 🎨   params.background type: ${typeof params.background}`);
+  console.log(`[DEBUG] 🎨   Boolean evaluation: ${!!params.background}`);
+  
   if (params.background) {
-    style.backcolour = '&H80000000';  // Черный с 50% прозрачностью
-    console.log(`[DEBUG] ✅ BACKGROUND ENABLED: Added backcolour=&H80000000`);
+    // Попробуем разные варианты цвета фона
+    const backgroundOptions = [
+      '&H80000000',  // Черный с 50% прозрачностью (оригинал)
+      '&H00000000',  // Черный непрозрачный
+      '&HFF000000',  // Черный с полной альфой
+      '&H80808080',  // Серый полупрозрачный
+      '&H000000'     // Простой черный без альфы
+    ];
+    
+    style.backcolour = backgroundOptions[0]; // Используем первый вариант
+    style.borderstyle = 3; // Добавляем borderstyle для гарантии
+    style.backgroundType = 'semi_transparent_black';
+    
+    console.log(`[DEBUG] 🎨 ✅ BACKGROUND ENABLED:`);
+    console.log(`[DEBUG] 🎨   Added backcolour: ${style.backcolour}`);
+    console.log(`[DEBUG] 🎨   Added borderstyle: ${style.borderstyle}`);
+    console.log(`[DEBUG] 🎨   Background type: ${style.backgroundType}`);
+    console.log(`[DEBUG] 🎨   All background options: ${backgroundOptions.join(', ')}`);
   } else {
-    console.log(`[DEBUG] ❌ BACKGROUND DISABLED: no backcolour`);
+    style.backgroundType = 'none';
+    console.log(`[DEBUG] 🎨 ❌ BACKGROUND DISABLED: no backcolour`);
   }
   
   console.log(`[DEBUG] Final style object:`, style);
@@ -313,11 +335,12 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'healthy', 
     timestamp: new Date().toISOString(),
-    mode: 'CUSTOM_STYLES_WITH_MAXIMUM_QUALITY_STREAMING',
+    mode: 'CUSTOM_STYLES_WITH_MAXIMUM_QUALITY_STREAMING_DEBUG',
     style_system: 'CUSTOM_PARAMETERS_ONLY',
     available_fonts: AVAILABLE_FONTS,
     available_positions: Object.keys(SUBTITLE_POSITIONS),
     quality_mode: 'NO_COMPRESSION_MAXIMUM_QUALITY_STREAMING_ENABLED',
+    debug_mode: 'BACKGROUND_DEBUGGING_ENABLED',
     style_parameters: {
       fontsize: 'number (6-12)',
       fontcolor: 'string (hex without #)',
@@ -453,7 +476,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
   const taskId = req.body.task_id || uuidv4();
   const startTime = Date.now();
   
-  console.log(`\n=== [${taskId}] CUSTOM STYLE PROCESSING (VALIDATED JSON) ===`);
+  console.log(`\n=== [${taskId}] CUSTOM STYLE PROCESSING (VALIDATED JSON + BACKGROUND DEBUG) ===`);
 
   try {
     // Валидация входных данных
@@ -496,7 +519,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     console.log(`[${taskId}]   bold: "${styleParams.bold}" (type: ${typeof styleParams.bold})`);
     console.log(`[${taskId}]   outline: "${styleParams.outline}" (type: ${typeof styleParams.outline})`);
     console.log(`[${taskId}]   position: "${styleParams.position}" (type: ${typeof styleParams.position})`);
-    console.log(`[${taskId}]   background: "${styleParams.background}" (type: ${typeof styleParams.background})`);
+    console.log(`[${taskId}] 🔥 BACKGROUND: "${styleParams.background}" (type: ${typeof styleParams.background})`);
     console.log(`[${taskId}] 🎯 Quality mode: ${forceQuality}`);
     
     // 🎨 СОЗДАЕМ КАСТОМНЫЙ СТИЛЬ
@@ -534,101 +557,224 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     const beautifiedSRT = beautifySRT(rawSrtContent, taskId);
     fs.writeFileSync(srtPath, beautifiedSRT, 'utf8');
 
-    // 🎨 СТРОИМ STYLE STRING ДЛЯ FFMPEG
+    // 🎨 СТРОИМ STYLE STRING ДЛЯ FFMPEG С ДЕТАЛЬНЫМ ЛОГИРОВАНИЕМ
     const buildStyleString = (style) => {
+      console.log(`[${taskId}] 🔧 Building FFmpeg style string...`);
+      console.log(`[${taskId}] 🔧 Input style object:`, style);
+      
       let styleStr = `Fontsize=${style.fontsize}`;
+      console.log(`[${taskId}] 🔧 Added fontsize: ${styleStr}`);
       
       if (style.fontname) {
         styleStr += `,Fontname=${style.fontname}`;
+        console.log(`[${taskId}] 🔧 Added fontname: current string = ${styleStr}`);
       }
       
       if (style.fontcolor) {
         const color = style.fontcolor.startsWith('&H') ? style.fontcolor : `&H${style.fontcolor}`;
         styleStr += `,PrimaryColour=${color}`;
+        console.log(`[${taskId}] 🔧 Added color: ${color}, current string = ${styleStr}`);
       }
       
       if (style.outline && style.outline > 0) {
         styleStr += `,OutlineColour=&H000000,Outline=${style.outline}`;
+        console.log(`[${taskId}] 🔧 Added outline: current string = ${styleStr}`);
       }
       
       if (style.shadow && style.shadow > 0) {
         styleStr += `,Shadow=${style.shadow}`;
+        console.log(`[${taskId}] 🔧 Added shadow: current string = ${styleStr}`);
       }
       
       if (style.bold) {
         styleStr += `,Bold=${style.bold}`;
+        console.log(`[${taskId}] 🔧 Added bold: current string = ${styleStr}`);
       }
       
       if (style.alignment) {
         styleStr += `,Alignment=${style.alignment}`;
+        console.log(`[${taskId}] 🔧 Added alignment: current string = ${styleStr}`);
       }
       
       if (style.marginv !== undefined) {
         styleStr += `,MarginV=${style.marginv}`;
+        console.log(`[${taskId}] 🔧 Added marginV: current string = ${styleStr}`);
       }
+      
+      // 🔥 ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ ФОНА
+      console.log(`[${taskId}] 🔥 BACKGROUND PROCESSING IN buildStyleString:`);
+      console.log(`[${taskId}] 🔥   style.backcolour: "${style.backcolour}"`);
+      console.log(`[${taskId}] 🔥   style.borderstyle: "${style.borderstyle}"`);
+      console.log(`[${taskId}] 🔥   style.backgroundType: "${style.backgroundType}"`);
       
       if (style.backcolour) {
         styleStr += `,BackColour=${style.backcolour}`;
+        console.log(`[${taskId}] 🔥 ✅ BACKGROUND ADDED TO STYLE STRING!`);
+        console.log(`[${taskId}] 🔥   Added BackColour=${style.backcolour}`);
+        console.log(`[${taskId}] 🔥   Current string = ${styleStr}`);
+        
+        // Добавляем BorderStyle для гарантии работы фона
+        if (style.borderstyle) {
+          styleStr += `,BorderStyle=${style.borderstyle}`;
+          console.log(`[${taskId}] 🔥   Added BorderStyle=${style.borderstyle}`);
+          console.log(`[${taskId}] 🔥   Final string with border = ${styleStr}`);
+        }
+      } else {
+        console.log(`[${taskId}] 🔥 ❌ NO BACKGROUND in style object`);
       }
       
+      console.log(`[${taskId}] 🔧 Final style string: ${styleStr}`);
       return styleStr;
     };
 
     const styleString = buildStyleString(selectedStyle);
     console.log(`[${taskId}] 🎨 FFmpeg style string: ${styleString}`);
 
-    // Строим FFmpeg команды с fallback логикой
-    const mainCommand = `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${styleString}'" -c:a copy -c:v libx264 -preset ${optimalSettings.preset} -crf ${optimalSettings.crf} -pix_fmt yuv420p${optimalSettings.tune ? ` -tune ${optimalSettings.tune}` : ''} -profile:v ${optimalSettings.profile}${optimalSettings.level ? ` -level ${optimalSettings.level}` : ''} -movflags +faststart -y "${outputVideoPath}"`;
+    // 🔥 ДОПОЛНИТЕЛЬНОЕ ЛОГИРОВАНИЕ ДЛЯ АНАЛИЗА ПРОБЛЕМЫ
+    console.log(`[${taskId}] 🔍 BACKGROUND DEBUGGING SUMMARY:`);
+    console.log(`[${taskId}] 🔍   Original background param: "${styleParams.background}"`);
+    console.log(`[${taskId}] 🔍   Parsed background param: ${selectedStyle.backgroundType !== 'none'}`);
+    console.log(`[${taskId}] 🔍   Style contains backcolour: ${!!selectedStyle.backcolour}`);
+    console.log(`[${taskId}] 🔍   BackColour value: "${selectedStyle.backcolour}"`);
+    console.log(`[${taskId}] 🔍   Style string contains BackColour: ${styleString.includes('BackColour')}`);
+    console.log(`[${taskId}] 🔍   Final FFmpeg style: ${styleString}`);
 
-    // Создаем fallback команды с упрощенными стилями
-    const simplifiedStyleString = `Fontname=DejaVu Sans,Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${selectedStyle.outline || 2}`;
-    
-    const commands = [
-      mainCommand,
-      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${styleString}'" -c:a copy -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -movflags +faststart -y "${outputVideoPath}"`,
-      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${simplifiedStyleString}'" -c:a copy -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -y "${outputVideoPath}"`,
-      `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}'" -c:a copy -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -y "${outputVideoPath}"`
-    ];
+    // Строим FFmpeg команды с fallback логикой и альтернативными вариантами фона
+    const createCommands = (style, optimalSettings) => {
+      const baseStyle = styleString;
+      
+      // Создаем альтернативные варианты для фона если он включен
+      const backgroundVariants = selectedStyle.backcolour ? [
+        baseStyle, // Оригинальный стиль
+        baseStyle.replace('BackColour=&H80000000', 'BackColour=&H00000000'), // Черный непрозрачный
+        baseStyle.replace('BackColour=&H80000000', 'BackColour=&HFF000000'), // Черный с полной альфой
+        baseStyle + ',BorderStyle=3', // Добавляем BorderStyle принудительно
+        baseStyle.replace('BackColour=&H80000000', 'BackColour=&H80808080'), // Серый полупрозрачный
+      ] : [baseStyle];
+      
+      console.log(`[${taskId}] 🔥 Created ${backgroundVariants.length} background variants:`);
+      backgroundVariants.forEach((variant, index) => {
+        console.log(`[${taskId}] 🔥   Variant ${index + 1}: ${variant}`);
+      });
+      
+      const commands = [];
+      
+      // Для каждого варианта стиля создаем команду с оптимальными настройками
+      backgroundVariants.forEach((styleVariant, index) => {
+        const command = `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${styleVariant}'" -c:a copy -c:v libx264 -preset ${optimalSettings.preset} -crf ${optimalSettings.crf} -pix_fmt yuv420p${optimalSettings.tune ? ` -tune ${optimalSettings.tune}` : ''} -profile:v ${optimalSettings.profile}${optimalSettings.level ? ` -level ${optimalSettings.level}` : ''} -movflags +faststart -y "${outputVideoPath}"`;
+        commands.push({
+          command,
+          description: `Style variant ${index + 1} with ${optimalSettings.description}`,
+          styleVariant,
+          isBackgroundTest: selectedStyle.backcolour && index > 0
+        });
+      });
+      
+      // Добавляем упрощенные fallback команды
+      const simplifiedStyleString = `Fontname=DejaVu Sans,Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${selectedStyle.outline || 2}`;
+      
+      // Если фон включен, добавляем альтернативные команды для тестирования
+      if (selectedStyle.backcolour) {
+        const backgroundTestCommands = [
+          `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${simplifiedStyleString},BackColour=&H80000000,BorderStyle=3'" -c:a copy -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -movflags +faststart -y "${outputVideoPath}"`,
+          `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${simplifiedStyleString},BackColour=&H00000000'" -c:a copy -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -y "${outputVideoPath}"`,
+          `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='Fontsize=${selectedStyle.fontsize},BackColour=&H80000000,BorderStyle=3'" -c:a copy -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -y "${outputVideoPath}"`,
+        ];
+        
+        backgroundTestCommands.forEach((cmd, index) => {
+          commands.push({
+            command: cmd,
+            description: `Background test method ${index + 1}`,
+            styleVariant: `background_test_${index + 1}`,
+            isBackgroundTest: true
+          });
+        });
+      }
+      
+      // Добавляем базовые fallback команды
+      commands.push(
+        {
+          command: `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${simplifiedStyleString}'" -c:a copy -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -movflags +faststart -y "${outputVideoPath}"`,
+          description: 'Simplified style fallback',
+          styleVariant: simplifiedStyleString,
+          isBackgroundTest: false
+        },
+        {
+          command: `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}'" -c:a copy -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -y "${outputVideoPath}"`,
+          description: 'Basic subtitle fallback',
+          styleVariant: 'default',
+          isBackgroundTest: false
+        }
+      );
+      
+      return commands;
+    };
+
+    const commands = createCommands(selectedStyle, optimalSettings);
+    console.log(`[${taskId}] 🎯 Created ${commands.length} total commands (including background tests)`);
 
     let success = false;
     let usedCommand = 0;
+    let usedMethod = '';
 
     // Выполняем команды ПОСЛЕДОВАТЕЛЬНО
     for (let i = 0; i < commands.length && !success; i++) {
       try {
-        console.log(`[${taskId}] 🎨 Trying custom style method ${i + 1}...`);
+        const cmdInfo = commands[i];
+        console.log(`[${taskId}] 🎨 Trying method ${i + 1}: ${cmdInfo.description}`);
+        console.log(`[${taskId}] 🎨   Style variant: ${cmdInfo.styleVariant.substring(0, 100)}...`);
+        console.log(`[${taskId}] 🎨   Is background test: ${cmdInfo.isBackgroundTest}`);
         
         if (fs.existsSync(outputVideoPath)) fs.unlinkSync(outputVideoPath);
         
         const cmdStartTime = Date.now();
-        execSync(commands[i], { 
+        console.log(`[${taskId}] 🔧 Executing FFmpeg command...`);
+        
+        execSync(cmdInfo.command, { 
           stdio: 'pipe',
           timeout: 600000,
           maxBuffer: 1024 * 1024 * 200
         });
+        
         const cmdDuration = Date.now() - cmdStartTime;
         
         if (fs.existsSync(outputVideoPath)) {
           const outputSize = fs.statSync(outputVideoPath).size;
           if (outputSize > 0) {
-            console.log(`[${taskId}] ✅ CUSTOM STYLE SUCCESS! Method ${i + 1} worked! (${cmdDuration}ms)`);
-            console.log(`[${taskId}] Output size: ${(outputSize / 1024 / 1024).toFixed(2)}MB`);
+            console.log(`[${taskId}] ✅ SUCCESS! Method ${i + 1} worked! (${cmdDuration}ms)`);
+            console.log(`[${taskId}] ✅ Description: ${cmdInfo.description}`);
+            console.log(`[${taskId}] ✅ Output size: ${(outputSize / 1024 / 1024).toFixed(2)}MB`);
+            console.log(`[${taskId}] ✅ Background test: ${cmdInfo.isBackgroundTest}`);
+            console.log(`[${taskId}] ✅ Style used: ${cmdInfo.styleVariant}`);
+            
             success = true;
             usedCommand = i + 1;
+            usedMethod = cmdInfo.description;
+            
+            // Если это успешный тест фона, логируем дополнительную информацию
+            if (cmdInfo.isBackgroundTest) {
+              console.log(`[${taskId}] 🔥 BACKGROUND TEST SUCCESS!`);
+              console.log(`[${taskId}] 🔥   This means background styling CAN work`);
+              console.log(`[${taskId}] 🔥   Working style: ${cmdInfo.styleVariant}`);
+            }
+            
             break;
           }
         }
       } catch (error) {
-        console.log(`[${taskId}] ❌ Custom style method ${i + 1} failed:`, error.message);
+        console.log(`[${taskId}] ❌ Method ${i + 1} failed:`, error.message);
+        if (commands[i].isBackgroundTest) {
+          console.log(`[${taskId}] 🔥 Background test ${i + 1} failed - this helps narrow down the issue`);
+        }
       }
     }
 
     if (!success) {
-      throw new Error('All custom style methods failed');
+      throw new Error('All methods failed including background tests');
     }
 
     // ВАЛИДАЦИЯ И СОЗДАНИЕ ОТВЕТА
-    console.log(`[${taskId}] 🎉 CUSTOM STYLE PROCESSING SUCCESS! 🚀`);
+    console.log(`[${taskId}] 🎉 PROCESSING SUCCESS! 🚀`);
     
     // Проверяем что файл существует и имеет правильный размер
     if (!fs.existsSync(outputVideoPath)) {
@@ -675,6 +821,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     console.log(`[${taskId}] Processing time: ${processingTime}ms`);
     console.log(`[${taskId}] Size change: ${sizeChange > 0 ? '+' : ''}${sizeChange.toFixed(1)}%`);
     console.log(`[${taskId}] Quality mode: ${optimalSettings.description}`);
+    console.log(`[${taskId}] Method used: ${usedMethod}`);
     console.log(`[${taskId}] 🚀 Sending validated JSON response...`);
 
     // Очистка временных файлов
@@ -689,7 +836,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
       }
     });
 
-    // Создаем ответ с метаданными кастомного стиля
+    // Создаем ответ с метаданными кастомного стиля и отладочной информацией
     const responseData = {
       success: true,
       task_id: taskId,
@@ -698,18 +845,18 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
         input_size_bytes: videoBuffer.length,
         output_size_bytes: processedVideoBuffer.length,
         size_change_percent: parseFloat(sizeChange.toFixed(1)),
-        method_used: `CUSTOM_STYLE_METHOD_${usedCommand}`,
+        method_used: `METHOD_${usedCommand}`,
+        method_description: usedMethod,
         quality_mode: forceQuality,
         quality_description: optimalSettings.description
       },
       video_data: base64Data,
       content_type: 'video/mp4',
-      // Добавляем метаданные для валидации на клиенте
       video_metadata: {
         original_size_bytes: processedVideoBuffer.length,
         base64_length: base64Data.length,
-        expected_decoded_size: Math.ceil(base64Data.length * 3 / 4), // Base64 overhead
-        file_signature: processedVideoBuffer.slice(0, 12).toString('hex'), // MP4 magic bytes
+        expected_decoded_size: Math.ceil(base64Data.length * 3 / 4),
+        file_signature: processedVideoBuffer.slice(0, 12).toString('hex'),
         is_valid_mp4: isValidMP4,
         content_type: 'video/mp4',
         encoding: 'base64'
@@ -730,16 +877,30 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
         crf_used: optimalSettings.crf,
         preset_used: optimalSettings.preset,
         profile_used: optimalSettings.profile
+      },
+      // 🔥 ДОБАВЛЯЕМ ОТЛАДОЧНУЮ ИНФОРМАЦИЮ ДЛЯ ФОНА
+      background_debug: {
+        background_requested: !!styleParams.background,
+        background_parsed: selectedStyle.backgroundType !== 'none',
+        background_in_style: !!selectedStyle.backcolour,
+        backcolour_value: selectedStyle.backcolour || 'none',
+        style_contains_background: styleString.includes('BackColour'),
+        ffmpeg_style_final: styleString,
+        total_methods_tested: commands.length,
+        successful_method: usedCommand,
+        successful_method_description: usedMethod,
+        background_variants_tested: commands.filter(cmd => cmd.isBackgroundTest).length
       }
     };
 
-    console.log(`[${taskId}] 📤 Sending JSON response with custom styled video data...`);
+    console.log(`[${taskId}] 📤 Sending JSON response with debug info...`);
+    console.log(`[${taskId}] 🔥 Background debug summary:`, responseData.background_debug);
 
     // Отправляем ответ
     res.json(responseData);
 
   } catch (error) {
-    console.error(`[${taskId}] 💥 CUSTOM STYLE ERROR:`, error.message);
+    console.error(`[${taskId}] 💥 ERROR:`, error.message);
 
     // Очистка при ошибке
     const tempFiles = [
@@ -767,14 +928,15 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
 const server = app.listen(PORT, () => {
   console.log(`🎨 CUSTOM STYLE Subtitle Service running on port ${PORT} 🎨`);
   console.log(`📱 Ready for custom subtitle styles with MAXIMUM QUALITY!`);
+  console.log(`🔥 BACKGROUND DEBUGGING MODE ENABLED`);
   console.log(`🎯 Style system: CUSTOM_PARAMETERS_ONLY`);
   console.log(`✨ Available parameters:`);
   console.log(`   • fontsize (6-12) - Text size`);
   console.log(`   • fontcolor (hex) - Text color`);
   console.log(`   • bold (true/false) - Bold text`);
   console.log(`   • outline (true/false) - Text outline`);
+  console.log(`   • background (true/false) - Black transparent background [DEBUG MODE]`);
   console.log(`   • position (bottom/top/center) - Text position`);
-  console.log(`   • background (true/false) - Black transparent background`);
   console.log(`🎯 Quality modes available:`);
   console.log(`   • auto - Adaptive quality based on input analysis`);
   console.log(`   • lossless - Perfect quality preservation (CRF 0)`);
@@ -783,11 +945,11 @@ const server = app.listen(PORT, () => {
   console.log(`   • medium - Medium quality (CRF 18)`);
   console.log(`   • low - Low quality for testing (CRF 28)`);
   console.log(`🚀 Endpoints available:`);
-  console.log(`   • POST /process-video-stream (Custom styles - Validated JSON)`);
+  console.log(`   • POST /process-video-stream (Custom styles - Validated JSON + Background Debug)`);
   console.log(`   • GET /health (System status)`);
   const systemInfo = getSystemInfo();
   console.log(`FFmpeg: ${systemInfo.ffmpeg_available}`);
-  console.log(`Quality Mode: CUSTOM_STYLES_WITH_MP4_VERIFICATION`);
+  console.log(`Quality Mode: CUSTOM_STYLES_WITH_MP4_VERIFICATION_AND_BACKGROUND_DEBUG`);
 });
 
 // Увеличиваем timeout сервера
