@@ -550,6 +550,9 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     const { style: selectedStyle, description: styleDescription } = buildCustomStyle(styleParams);
     console.log(`[${taskId}] Style: ${styleDescription}`);
 
+    // 🎨 ПОЛУЧАЕМ ИНФОРМАЦИЮ О ФОНЕ ДЛЯ ДАЛЬНЕЙШЕГО ИСПОЛЬЗОВАНИЯ
+    const backgroundInfo = parseBackgroundColor(styleParams.background);
+
     // Создаем временные файлы
     const tempDir = '/tmp/processing';
     if (!fs.existsSync(tempDir)) {
