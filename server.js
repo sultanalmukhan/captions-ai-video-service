@@ -120,7 +120,8 @@ function buildCustomStyle(styleParams) {
   const backgroundInfo = parseBackgroundColor(params.background);
   if (backgroundInfo.enabled) {
     style.backcolour = backgroundInfo.ffmpegColor;
-    style.borderstyle = 3;  // Важно для работы фона
+    // ИСПРАВЛЕНИЕ: НЕ добавляем BorderStyle=3, это вызывает черный прямоугольник
+    // style.borderstyle = 3;  // Убираем эту строку!
   }
   
   return {
@@ -573,9 +574,10 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
       
       if (style.backcolour) {
         styleStr += `,BackColour=${style.backcolour}`;
-        if (style.borderstyle) {
-          styleStr += `,BorderStyle=${style.borderstyle}`;
-        }
+        // ИСПРАВЛЕНИЕ: НЕ добавляем BorderStyle - это создает черный прямоугольник
+        // if (style.borderstyle) {
+        //   styleStr += `,BorderStyle=${style.borderstyle}`;
+        // }
       }
       
       return styleStr;
@@ -586,7 +588,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     // Строим FFmpeg команды с fallback логикой
     const mainCommand = `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${styleString}'" -c:a copy -c:v libx264 -preset ${optimalSettings.preset} -crf ${optimalSettings.crf} -pix_fmt yuv420p${optimalSettings.tune ? ` -tune ${optimalSettings.tune}` : ''} -profile:v ${optimalSettings.profile}${optimalSettings.level ? ` -level ${optimalSettings.level}` : ''} -movflags +faststart -y "${outputVideoPath}"`;
 
-    const simplifiedStyleString = `Fontname=DejaVu Sans,Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${selectedStyle.outline || 2}${selectedStyle.backcolour ? `,BackColour=${selectedStyle.backcolour},BorderStyle=3` : ''}`;
+    const simplifiedStyleString = `Fontname=DejaVu Sans,Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${selectedStyle.outline || 2}${selectedStyle.backcolour ? `,BackColour=${selectedStyle.backcolour}` : ''}`;
     
     const commands = [
       mainCommand,
