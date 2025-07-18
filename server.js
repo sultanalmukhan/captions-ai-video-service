@@ -547,6 +547,15 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     console.log(`[${taskId}] Video size: ${(videoBuffer.length / 1024 / 1024).toFixed(2)}MB`);
     console.log(`[${taskId}] Quality mode: ${forceQuality}`);
     
+    console.log(`[${taskId}] 🎨 RAW INCOMING STYLE PARAMS:`);
+    console.log(`[${taskId}]   fontsize: "${styleParams.fontsize}" (type: ${typeof styleParams.fontsize})`);
+    console.log(`[${taskId}]   fontcolor: "${styleParams.fontcolor}" (type: ${typeof styleParams.fontcolor})`);
+    console.log(`[${taskId}]   bold: "${styleParams.bold}" (type: ${typeof styleParams.bold})`);
+    console.log(`[${taskId}]   outline: "${styleParams.outline}" (type: ${typeof styleParams.outline})`);
+    console.log(`[${taskId}]   position: "${styleParams.position}" (type: ${typeof styleParams.position})`);
+    console.log(`[${taskId}]   background: "${styleParams.background}" (type: ${typeof styleParams.background})`);
+    console.log(`[${taskId}] 🔥 backgroundTransparency: "${styleParams.backgroundTransparency}" (type: ${typeof styleParams.backgroundTransparency})`);
+    
     // 🎨 СОЗДАЕМ КАСТОМНЫЙ СТИЛЬ
     const { style: selectedStyle, description: styleDescription } = buildCustomStyle(styleParams);
     console.log(`[${taskId}] Style: ${styleDescription}`);
@@ -623,6 +632,17 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     };
 
     const styleString = buildStyleString(selectedStyle);
+    
+    console.log(`[${taskId}] 🔧 FINAL FFMPEG STYLE STRING: ${styleString}`);
+    
+    // Если есть фон, логируем дополнительную информацию
+    if (selectedStyle.backcolour) {
+      console.log(`[${taskId}] 🎨 BACKGROUND INFO:`);
+      console.log(`[${taskId}]   BackColour in style: ${selectedStyle.backcolour}`);
+      console.log(`[${taskId}]   BorderStyle in style: ${selectedStyle.borderstyle}`);
+      console.log(`[${taskId}]   Style contains BackColour: ${styleString.includes('BackColour')}`);
+      console.log(`[${taskId}]   Style contains BorderStyle: ${styleString.includes('BorderStyle')}`);
+    }
 
     // Строим FFmpeg команды с fallback логикой
     const mainCommand = `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${styleString}'" -c:a copy -c:v libx264 -preset ${optimalSettings.preset} -crf ${optimalSettings.crf} -pix_fmt yuv420p${optimalSettings.tune ? ` -tune ${optimalSettings.tune}` : ''} -profile:v ${optimalSettings.profile}${optimalSettings.level ? ` -level ${optimalSettings.level}` : ''} -movflags +faststart -y "${outputVideoPath}"`;
