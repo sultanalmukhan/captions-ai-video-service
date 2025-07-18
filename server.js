@@ -184,15 +184,25 @@ function parseBackgroundColor(backgroundParam, opacityParam) {
   console.log(`[DEBUG] RGB components: R=${red}, G=${green}, B=${blue}`);
   
   // Конвертируем opacity (0-1) в hex (00-FF)
-  // ВАЖНО: opacity где 0=прозрачный, 1=видимый (обратная логика от transparency)
+  // ВАЖНО: opacity где 0=прозрачный, 1=видимый
+  // ПРОБЛЕМА: Возможно FFmpeg интерпретирует альфа наоборот
   const opacity = parseFloat(opacityParam) || 0.5;
   console.log(`[DEBUG] Raw opacity: "${opacityParam}" -> parsed: ${opacity}`);
   
-  const alphaValue = Math.round(opacity * 255);
+  // ТЕСТИРУЕМ ОБЕ ЛОГИКИ:
+  const directAlpha = Math.round(opacity * 255);           // Прямая: 0.1 -> 26, 0.9 -> 230
+  const invertedAlpha = Math.round((1 - opacity) * 255);   // Обратная: 0.1 -> 230, 0.9 -> 26
+  
+  console.log(`[DEBUG] Direct alpha (opacity * 255): ${opacity} -> ${directAlpha} -> ${directAlpha.toString(16).padStart(2, '0').toUpperCase()}`);
+  console.log(`[DEBUG] Inverted alpha ((1-opacity) * 255): ${opacity} -> ${invertedAlpha} -> ${invertedAlpha.toString(16).padStart(2, '0').toUpperCase()}`);
+  
+  // ИСПОЛЬЗУЕМ ОБРАТНУЮ ЛОГИКУ (так как результат показывает что она нужна)
+  const alphaValue = invertedAlpha;
   const alpha = alphaValue.toString(16).padStart(2, '0').toUpperCase();
   
-  console.log(`[DEBUG] Alpha calculation: ${opacity} * 255 = ${alphaValue} -> hex: ${alpha}`);
-  console.log(`[DEBUG] Opacity logic: ${opacity} opacity = ${Math.round(opacity * 100)}% visible`);
+  console.log(`[DEBUG] USING INVERTED: ${opacity} opacity -> alpha=${alpha} (${alphaValue}/255)`);
+  console.log(`[DEBUG] Logic test: opacity ${opacity} should be ${Math.round(opacity * 100)}% visible`);
+  console.log(`[DEBUG] With inverted alpha ${alpha}: ${opacity > 0.5 ? 'should be MORE visible' : 'should be LESS visible'}`);
   
   // FFmpeg использует формат &HAABBGGRR (обратный порядок + альфа в начале)
   const ffmpegColor = `&H${alpha}${blue}${green}${red}`.toUpperCase();
