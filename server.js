@@ -133,6 +133,8 @@ function buildCustomStyle(styleParams) {
 
 // 🎨 ФУНКЦИЯ ПАРСИНГА ЦВЕТА ФОНА
 function parseBackgroundColor(backgroundParam) {
+  console.log(`[DEBUG] parseBackgroundColor called with: "${backgroundParam}"`);
+  
   // Если пустая строка, null, undefined или false - отключаем фон
   if (!backgroundParam || backgroundParam === '' || backgroundParam === 'false') {
     return {
@@ -156,6 +158,8 @@ function parseBackgroundColor(backgroundParam) {
   // Убираем # если есть
   colorString = colorString.replace('#', '');
   
+  console.log(`[DEBUG] Processing color string: "${colorString}"`);
+  
   // Проверяем валидность hex
   if (!/^[0-9a-fA-F]{6}$|^[0-9a-fA-F]{8}$/.test(colorString)) {
     console.warn(`Invalid background color: ${backgroundParam}, using default black semi-transparent`);
@@ -174,6 +178,7 @@ function parseBackgroundColor(backgroundParam) {
     red = colorString.substring(0, 2);
     green = colorString.substring(2, 4);
     blue = colorString.substring(4, 6);
+    console.log(`[DEBUG] 6-char color: R=${red}, G=${green}, B=${blue}, A=${alpha}`);
   } else {
     // AARRGGBB или RRGGBBAA
     if (isAlphaFirst(colorString)) {
@@ -182,32 +187,54 @@ function parseBackgroundColor(backgroundParam) {
       red = colorString.substring(2, 4);
       green = colorString.substring(4, 6);
       blue = colorString.substring(6, 8);
+      console.log(`[DEBUG] 8-char AARRGGBB: A=${alpha}, R=${red}, G=${green}, B=${blue}`);
     } else {
       // RRGGBBAA формат (более популярный)
       red = colorString.substring(0, 2);
       green = colorString.substring(2, 4);
       blue = colorString.substring(4, 6);
       alpha = colorString.substring(6, 8);
+      console.log(`[DEBUG] 8-char RRGGBBAA: R=${red}, G=${green}, B=${blue}, A=${alpha}`);
     }
   }
   
-  // FFmpeg использует формат &HAABBGGRR (обратный порядок + альфа в начале)
-  const ffmpegColor = `&H${alpha}${blue}${green}${red}`.toUpperCase();
+  // СПЕЦИАЛЬНАЯ ОБРАБОТКА ДЛЯ ЧЕРНОГО ЦВЕТА
+  let finalColor;
+  const isBlack = (red === '00' && green === '00' && blue === '00');
   
-  // ИСПРАВЛЕНИЕ: Для черного цвета (000000) с полной непрозрачностью 
-  // FFmpeg может некорректно интерпретировать &HFF000000
-  // Используем небольшой трюк - делаем цвет чуть-чуть не черным (010101)
-  const correctedColor = (red === '00' && green === '00' && blue === '00' && alpha === 'FF') 
-    ? '&HFF010101'  // Почти черный, но видимый
-    : ffmpegColor;
+  if (isBlack && alpha === 'FF') {
+    console.log(`[DEBUG] SPECIAL: Pure black detected, trying multiple approaches`);
+    
+    // Попробуем несколько вариантов для черного цвета
+    const blackVariants = [
+      '&HFF010101', // Почти черный RGB(1,1,1)
+      '&HFF000001', // Почти черный RGB(0,0,1) 
+      '&HFF101010', // Темно-серый RGB(16,16,16)
+      '&HE0000000', // Черный с 88% непрозрачностью
+      '&HC0000000', // Черный с 75% непрозрачностью
+    ];
+    
+    finalColor = blackVariants[0]; // Используем первый вариант по умолчанию
+    console.log(`[DEBUG] Using black variant: ${finalColor}`);
+  } else {
+    // FFmpeg использует формат &HAABBGGRR (обратный порядок + альфа в начале)
+    finalColor = `&H${alpha}${blue}${green}${red}`.toUpperCase();
+    console.log(`[DEBUG] Standard color: ${finalColor}`);
+  }
   
   const alphaPercent = Math.round((parseInt(alpha, 16) / 255) * 100);
-  const description = `#${red}${green}${blue} (${alphaPercent}% opacity)`;
+  const description = isBlack ? 
+    `black variant (${alphaPercent}% opacity)` : 
+    `#${red}${green}${blue} (${alphaPercent}% opacity)`;
+  
+  console.log(`[DEBUG] Final result: enabled=true, color=${finalColor}, description="${description}"`);
   
   return {
     enabled: true,
-    ffmpegColor: correctedColor,
-    description: description
+    ffmpegColor: finalColor,
+    description: description,
+    isBlackVariant: isBlack,
+    originalHex: `${red}${green}${blue}${alpha}`
   };
 }
 
@@ -595,6 +622,29 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
 
     // Строим FFmpeg команды с fallback логикой
     const mainCommand = `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${styleString}'" -c:a copy -c:v libx264 -preset ${optimalSettings.preset} -crf ${optimalSettings.crf} -pix_fmt yuv420p${optimalSettings.tune ? ` -tune ${optimalSettings.tune}` : ''} -profile:v ${optimalSettings.profile}${optimalSettings.level ? ` -level ${optimalSettings.level}` : ''} -movflags +faststart -y "${outputVideoPath}"`;
+
+    // Создаем дополнительные команды специально для черного фона
+    const commands = [mainCommand];
+    
+    // Если это черный фон, добавляем специальные fallback варианты
+    if (selectedStyle.backcolour && backgroundInfo.isBlackVariant) {
+      console.log(`[${taskId}] Adding special black background fallbacks...`);
+      
+      const blackVariants = [
+        '&HFF010101', // RGB(1,1,1)
+        '&HFF101010', // RGB(16,16,16)  
+        '&HE0000000', // Черный 88% непрозрачность
+        '&HC0000000', // Черный 75% непрозрачность
+        '&H80000000', // Черный 50% непрозрачность (рабочий вариант)
+      ];
+      
+      blackVariants.forEach((blackColor, index) => {
+        const blackStyleString = styleString.replace(selectedStyle.backcolour, blackColor);
+        const blackCommand = `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${blackStyleString}'" -c:a copy -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -movflags +faststart -y "${outputVideoPath}"`;
+        commands.push(blackCommand);
+        console.log(`[${taskId}] Black variant ${index + 1}: ${blackColor}`);
+      });
+    }
 
     const simplifiedStyleString = `Fontname=DejaVu Sans,Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${selectedStyle.outline || 2}${selectedStyle.backcolour ? `,BackColour=${selectedStyle.backcolour},BorderStyle=4` : ''}`;
     
