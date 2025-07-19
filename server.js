@@ -1,5 +1,5 @@
 // Beautiful Railway Service с кастомными стилями + МАКСИМАЛЬНОЕ КАЧЕСТВО + STREAMING
-// server.js - Custom subtitle styles + NO COMPRESSION + NO TIMEOUT - PRODUCTION WITH SEPARATE BACKGROUND TRANSPARENCY
+// server.js - Custom subtitle styles + NO COMPRESSION + NO TIMEOUT - PRODUCTION CLEAN
 
 const express = require('express');
 const multer = require('multer');
@@ -86,20 +86,13 @@ function buildCustomStyle(styleParams) {
   
   const params = { ...defaults, ...styleParams };
   
-  console.log(`[DEBUG] buildCustomStyle - incoming styleParams:`, styleParams);
-  console.log(`[DEBUG] buildCustomStyle - after applying defaults:`, params);
-  
   // Валидация параметров
   params.fontsize = Math.max(6, Math.min(12, parseInt(params.fontsize) || 8));
   
-  // ИСПРАВЛЕНИЕ FONTCOLOR: добавляем детальное логирование и обработку BGR
-  console.log(`[DEBUG] buildCustomStyle - processing fontcolor: "${params.fontcolor}"`);
+  // Обработка fontcolor с конвертацией RGB в BGR
   params.fontcolor = (params.fontcolor || 'ffffff').replace('#', '').toLowerCase();
-  console.log(`[DEBUG] buildCustomStyle - cleaned fontcolor: "${params.fontcolor}"`);
   
-  // Проверяем что это валидный 6-символьный hex
   if (!/^[0-9a-f]{6}$/.test(params.fontcolor)) {
-    console.warn(`[DEBUG] Invalid fontcolor: "${params.fontcolor}", using default white`);
     params.fontcolor = 'ffffff';
   }
   
@@ -108,29 +101,17 @@ function buildCustomStyle(styleParams) {
     const red = params.fontcolor.substring(0, 2);
     const green = params.fontcolor.substring(2, 4);
     const blue = params.fontcolor.substring(4, 6);
-    
-    // FFmpeg использует BGR вместо RGB
-    const bgrColor = `${blue}${green}${red}`;
-    
-    console.log(`[DEBUG] fontcolor conversion:`);
-    console.log(`[DEBUG]   Original RGB: ${params.fontcolor} (R=${red}, G=${green}, B=${blue})`);
-    console.log(`[DEBUG]   FFmpeg BGR: ${bgrColor} (B=${blue}, G=${green}, R=${red})`);
-    
-    params.fontcolor = bgrColor;
+    params.fontcolor = `${blue}${green}${red}`; // BGR формат
   }
   
   params.bold = parseBooleanParam(params.bold);
   params.outline = parseBooleanParam(params.outline);
   
-  // ИСПРАВЛЕНИЕ: НЕ перезаписываем backgroundOpacity если он уже есть
+  // Валидация backgroundOpacity с правильной обработкой 0
   if (styleParams.backgroundOpacity !== undefined) {
-    // Используем ИСХОДНОЕ значение, не default
     params.backgroundOpacity = Math.max(0, Math.min(1, parseFloat(styleParams.backgroundOpacity)));
-    console.log(`[DEBUG] buildCustomStyle - using original backgroundOpacity: "${styleParams.backgroundOpacity}" -> ${params.backgroundOpacity}`);
   } else {
-    // Только если не задано - используем default
     params.backgroundOpacity = 0.5;
-    console.log(`[DEBUG] buildCustomStyle - using default backgroundOpacity: 0.5`);
   }
   
   if (!['bottom', 'top', 'center'].includes(params.position)) {
@@ -158,8 +139,6 @@ function buildCustomStyle(styleParams) {
     style.shadow = 0;
   }
   
-  console.log(`[DEBUG] buildCustomStyle - before parseBackgroundColor: background="${params.background}", opacity=${params.backgroundOpacity}`);
-  
   // Обрабатываем цвет фона
   const backgroundInfo = parseBackgroundColor(params.background, params.backgroundOpacity);
   if (backgroundInfo.enabled) {
@@ -173,15 +152,10 @@ function buildCustomStyle(styleParams) {
   };
 }
 
-// 🎨 ФУНКЦИЯ ПАРСИНГА ЦВЕТА ФОНА С РАЗДЕЛЬНОЙ ПРОЗРАЧНОСТЬЮ
+// 🎨 ФУНКЦИЯ ПАРСИНГА ЦВЕТА ФОНА
 function parseBackgroundColor(backgroundParam, opacityParam) {
-  console.log(`[DEBUG] parseBackgroundColor called with:`);
-  console.log(`[DEBUG]   backgroundParam: "${backgroundParam}" (type: ${typeof backgroundParam})`);
-  console.log(`[DEBUG]   opacityParam: "${opacityParam}" (type: ${typeof opacityParam})`);
-  
-  // Если пустая строка, null, undefined или false - отключаем фон
+  // Если пустая строка - отключаем фон
   if (!backgroundParam || backgroundParam === '' || backgroundParam === 'false') {
-    console.log(`[DEBUG] Background disabled (empty or false)`);
     return {
       enabled: false,
       ffmpegColor: null,
@@ -189,9 +163,8 @@ function parseBackgroundColor(backgroundParam, opacityParam) {
     };
   }
   
-  // Для обратной совместимости: если передали true или "true" - используем черный полупрозрачный
+  // Для обратной совместимости
   if (backgroundParam === true || backgroundParam === 'true') {
-    console.log(`[DEBUG] Using legacy true value`);
     return {
       enabled: true,
       ffmpegColor: '&H80000000',
@@ -199,16 +172,10 @@ function parseBackgroundColor(backgroundParam, opacityParam) {
     };
   }
   
-  let colorString = String(backgroundParam).trim();
+  let colorString = String(backgroundParam).trim().replace('#', '');
   
-  // Убираем # если есть
-  colorString = colorString.replace('#', '');
-  
-  console.log(`[DEBUG] Processed color string: "${colorString}"`);
-  
-  // НОВАЯ ЛОГИКА: Проверяем что это именно 6-символьный hex
+  // Проверяем валидность 6-символьного hex
   if (!/^[0-9a-fA-F]{6}$/.test(colorString)) {
-    console.warn(`[DEBUG] Invalid background color: ${backgroundParam}, expected 6-character hex (RRGGBB)`);
     return {
       enabled: false,
       ffmpegColor: null,
@@ -221,58 +188,22 @@ function parseBackgroundColor(backgroundParam, opacityParam) {
   const green = colorString.substring(2, 4);
   const blue = colorString.substring(4, 6);
   
-  console.log(`[DEBUG] RGB components: R=${red}, G=${green}, B=${blue}`);
-  
-  // Конвертируем opacity (0-1) в hex (00-FF)
-  // ВАЖНО: opacity где 0=прозрачный, 1=видимый
-  // ИСПРАВЛЕНИЕ: Правильно обрабатываем 0 как валидное значение
+  // Конвертируем opacity в alpha с правильной обработкой 0
   let opacity = parseFloat(opacityParam);
-  
-  // Проверяем на NaN и undefined, но НЕ на 0 (0 - валидное значение!)
   if (isNaN(opacity) || opacityParam === undefined || opacityParam === null || opacityParam === '') {
-    opacity = 0.5; // Default только если действительно не задано
+    opacity = 0.5;
   }
-  
-  // Ограничиваем диапазон 0-1
   opacity = Math.max(0, Math.min(1, opacity));
   
-  console.log(`[DEBUG] Raw opacity: "${opacityParam}" -> parsed: ${opacity}`);
-  console.log(`[DEBUG] Is zero opacity: ${opacity === 0 ? 'YES - should be fully transparent' : 'NO'}`);
-  
-  // ТЕСТИРУЕМ ОБЕ ЛОГИКИ:
-  const directAlpha = Math.round(opacity * 255);           // Прямая: 0.1 -> 26, 0.9 -> 230
-  const invertedAlpha = Math.round((1 - opacity) * 255);   // Обратная: 0.1 -> 230, 0.9 -> 26
-  
-  console.log(`[DEBUG] Direct alpha (opacity * 255): ${opacity} -> ${directAlpha} -> ${directAlpha.toString(16).padStart(2, '0').toUpperCase()}`);
-  console.log(`[DEBUG] Inverted alpha ((1-opacity) * 255): ${opacity} -> ${invertedAlpha} -> ${invertedAlpha.toString(16).padStart(2, '0').toUpperCase()}`);
-  
-  // ИСПОЛЬЗУЕМ ОБРАТНУЮ ЛОГИКУ (так как результат показывает что она нужна)
-  const alphaValue = invertedAlpha;
+  // Инвертируем для FFmpeg (opacity 0 = alpha FF, opacity 1 = alpha 00)
+  const alphaValue = Math.round((1 - opacity) * 255);
   const alpha = alphaValue.toString(16).padStart(2, '0').toUpperCase();
   
-  console.log(`[DEBUG] USING INVERTED: ${opacity} opacity -> alpha=${alpha} (${alphaValue}/255)`);
-  console.log(`[DEBUG] Logic test: opacity ${opacity} should be ${Math.round(opacity * 100)}% visible`);
-  
-  if (opacity === 0) {
-    console.log(`[DEBUG] ⚠️ ZERO OPACITY: Should produce alpha=FF (255) for fully transparent background`);
-  } else if (opacity === 1) {
-    console.log(`[DEBUG] ✅ FULL OPACITY: Should produce alpha=00 (0) for fully visible background`);
-  }
-  
-  // FFmpeg использует формат &HAABBGGRR (обратный порядок + альфа в начале)
+  // FFmpeg формат &HAABBGGRR
   const ffmpegColor = `&H${alpha}${blue}${green}${red}`.toUpperCase();
-  
-  console.log(`[DEBUG] FFmpeg color format: &H${alpha}${blue}${green}${red} = ${ffmpegColor}`);
   
   const opacityPercent = Math.round(opacity * 100);
   const description = `#${red}${green}${blue} (${opacityPercent}% visible)`;
-  
-  console.log(`[DEBUG] Final result:`);
-  console.log(`[DEBUG]   enabled: true`);
-  console.log(`[DEBUG]   ffmpegColor: ${ffmpegColor}`);
-  console.log(`[DEBUG]   description: ${description}`);
-  console.log(`[DEBUG]   originalColor: ${colorString}`);
-  console.log(`[DEBUG]   opacity: ${opacity}`);
   
   return {
     enabled: true,
@@ -420,8 +351,8 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'healthy', 
     timestamp: new Date().toISOString(),
-    mode: 'CUSTOM_STYLES_WITH_MAXIMUM_QUALITY_STREAMING_SEPARATE_TRANSPARENCY',
-    style_system: 'CUSTOM_PARAMETERS_WITH_SEPARATE_BACKGROUND_TRANSPARENCY',
+    mode: 'CUSTOM_STYLES_WITH_MAXIMUM_QUALITY_STREAMING_PRODUCTION',
+    style_system: 'CUSTOM_PARAMETERS_WITH_SEPARATE_BACKGROUND_OPACITY',
     available_fonts: AVAILABLE_FONTS,
     available_positions: Object.keys(SUBTITLE_POSITIONS),
     quality_mode: 'NO_COMPRESSION_MAXIMUM_QUALITY_STREAMING_ENABLED',
@@ -577,15 +508,6 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     console.log(`[${taskId}] Video size: ${(videoBuffer.length / 1024 / 1024).toFixed(2)}MB`);
     console.log(`[${taskId}] Quality mode: ${forceQuality}`);
     
-    console.log(`[${taskId}] 🎨 RAW INCOMING STYLE PARAMS:`);
-    console.log(`[${taskId}]   fontsize: "${styleParams.fontsize}" (type: ${typeof styleParams.fontsize})`);
-    console.log(`[${taskId}]   fontcolor: "${styleParams.fontcolor}" (type: ${typeof styleParams.fontcolor})`);
-    console.log(`[${taskId}]   bold: "${styleParams.bold}" (type: ${typeof styleParams.bold})`);
-    console.log(`[${taskId}]   outline: "${styleParams.outline}" (type: ${typeof styleParams.outline})`);
-    console.log(`[${taskId}]   position: "${styleParams.position}" (type: ${typeof styleParams.position})`);
-    console.log(`[${taskId}]   background: "${styleParams.background}" (type: ${typeof styleParams.background})`);
-    console.log(`[${taskId}] 🔥 backgroundOpacity: "${styleParams.backgroundOpacity}" (type: ${typeof styleParams.backgroundOpacity})`);
-    
     // 🎨 СОЗДАЕМ КАСТОМНЫЙ СТИЛЬ
     const { style: selectedStyle, description: styleDescription } = buildCustomStyle(styleParams);
     console.log(`[${taskId}] Style: ${styleDescription}`);
@@ -625,7 +547,6 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
       if (style.fontcolor) {
         const color = style.fontcolor.startsWith('&H') ? style.fontcolor : `&H${style.fontcolor}`;
         styleStr += `,PrimaryColour=${color}`;
-        console.log(`[DEBUG] buildStyleString - fontcolor: "${style.fontcolor}" -> FFmpeg: "${color}"`);
       }
       
       if (style.outline && style.outline > 0) {
@@ -659,17 +580,6 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     };
 
     const styleString = buildStyleString(selectedStyle);
-    
-    console.log(`[${taskId}] 🔧 FINAL FFMPEG STYLE STRING: ${styleString}`);
-    
-    // Если есть фон, логируем дополнительную информацию
-    if (selectedStyle.backcolour) {
-      console.log(`[${taskId}] 🎨 BACKGROUND INFO:`);
-      console.log(`[${taskId}]   BackColour in style: ${selectedStyle.backcolour}`);
-      console.log(`[${taskId}]   BorderStyle in style: ${selectedStyle.borderstyle}`);
-      console.log(`[${taskId}]   Style contains BackColour: ${styleString.includes('BackColour')}`);
-      console.log(`[${taskId}]   Style contains BorderStyle: ${styleString.includes('BorderStyle')}`);
-    }
 
     // Строим FFmpeg команды с fallback логикой
     const mainCommand = `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${styleString}'" -c:a copy -c:v libx264 -preset ${optimalSettings.preset} -crf ${optimalSettings.crf} -pix_fmt yuv420p${optimalSettings.tune ? ` -tune ${optimalSettings.tune}` : ''} -profile:v ${optimalSettings.profile}${optimalSettings.level ? ` -level ${optimalSettings.level}` : ''} -movflags +faststart -y "${outputVideoPath}"`;
@@ -769,6 +679,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
         original_size_bytes: processedVideoBuffer.length,
         base64_length: base64Data.length,
         expected_decoded_size: Math.ceil(base64Data.length * 3 / 4),
+        file_signature: processedVideoBuffer.slice(0, 12).toString('hex'),
         is_valid_mp4: isValidMP4,
         content_type: 'video/mp4',
         encoding: 'base64'
@@ -821,7 +732,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
 const server = app.listen(PORT, () => {
   console.log(`🎨 CUSTOM STYLE Subtitle Service running on port ${PORT}`);
   console.log(`📱 Ready for custom subtitle styles with MAXIMUM QUALITY!`);
-  console.log(`🎯 Style system: CUSTOM_PARAMETERS_WITH_SEPARATE_BACKGROUND_TRANSPARENCY`);
+  console.log(`🎯 Style system: CUSTOM_PARAMETERS_WITH_SEPARATE_BACKGROUND_OPACITY`);
   console.log(`✨ Available parameters:`);
   console.log(`   • fontsize (6-12) - Text size`);
   console.log(`   • fontcolor (hex) - Text color`);
@@ -837,7 +748,7 @@ const server = app.listen(PORT, () => {
   
   const systemInfo = getSystemInfo();
   console.log(`FFmpeg: ${systemInfo.ffmpeg_available}`);
-  console.log(`Quality Mode: CUSTOM_STYLES_WITH_MP4_VERIFICATION_SEPARATE_TRANSPARENCY`);
+  console.log(`Quality Mode: CUSTOM_STYLES_PRODUCTION_READY`);
 });
 
 // Увеличиваем timeout сервера
