@@ -91,7 +91,34 @@ function buildCustomStyle(styleParams) {
   
   // Валидация параметров
   params.fontsize = Math.max(6, Math.min(12, parseInt(params.fontsize) || 8));
+  
+  // ИСПРАВЛЕНИЕ FONTCOLOR: добавляем детальное логирование и обработку BGR
+  console.log(`[DEBUG] buildCustomStyle - processing fontcolor: "${params.fontcolor}"`);
   params.fontcolor = (params.fontcolor || 'ffffff').replace('#', '').toLowerCase();
+  console.log(`[DEBUG] buildCustomStyle - cleaned fontcolor: "${params.fontcolor}"`);
+  
+  // Проверяем что это валидный 6-символьный hex
+  if (!/^[0-9a-f]{6}$/.test(params.fontcolor)) {
+    console.warn(`[DEBUG] Invalid fontcolor: "${params.fontcolor}", using default white`);
+    params.fontcolor = 'ffffff';
+  }
+  
+  // Конвертируем RGB в BGR для FFmpeg
+  if (params.fontcolor.length === 6) {
+    const red = params.fontcolor.substring(0, 2);
+    const green = params.fontcolor.substring(2, 4);
+    const blue = params.fontcolor.substring(4, 6);
+    
+    // FFmpeg использует BGR вместо RGB
+    const bgrColor = `${blue}${green}${red}`;
+    
+    console.log(`[DEBUG] fontcolor conversion:`);
+    console.log(`[DEBUG]   Original RGB: ${params.fontcolor} (R=${red}, G=${green}, B=${blue})`);
+    console.log(`[DEBUG]   FFmpeg BGR: ${bgrColor} (B=${blue}, G=${green}, R=${red})`);
+    
+    params.fontcolor = bgrColor;
+  }
+  
   params.bold = parseBooleanParam(params.bold);
   params.outline = parseBooleanParam(params.outline);
   
@@ -598,6 +625,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
       if (style.fontcolor) {
         const color = style.fontcolor.startsWith('&H') ? style.fontcolor : `&H${style.fontcolor}`;
         styleStr += `,PrimaryColour=${color}`;
+        console.log(`[DEBUG] buildStyleString - fontcolor: "${style.fontcolor}" -> FFmpeg: "${color}"`);
       }
       
       if (style.outline && style.outline > 0) {
