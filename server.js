@@ -64,19 +64,42 @@ const SUBTITLE_POSITIONS = {
 
 // 🎯 ДОСТУПНЫЕ ШРИФТЫ
 const AVAILABLE_FONTS = [
-  'DejaVu Sans',
-  'Ubuntu', 
-  'Liberation Sans',
-  'Noto Sans',
   'Roboto',
-  'Open Sans'
+  'Open Sans', 
+  'Arial',
+  'Helvetica',
+  'Montserrat',
+  'Lato',
+  'Source Sans Pro',
+  'Poppins',
+  'Inter',
+  'Ubuntu',
+  'Oswald',
+  'Raleway',
+  'Nunito',
+  'Quicksand',
+  'Courier New',
+  'Georgia',
+  'Merriweather'
 ];
+
+// === ФУНКЦИЯ ДЛЯ ВАЛИДАЦИИ ШРИФТА ===
+function validateFont(fontName) {
+  if (!fontName) return 'Roboto'; // Default
+  
+  const validFont = AVAILABLE_FONTS.find(f => 
+    f.toLowerCase() === fontName.toLowerCase()
+  );
+  
+  return validFont || 'Arial'; // Fallback to Arial if not found
+}
 
 // 🎨 ФУНКЦИЯ СОЗДАНИЯ СТИЛЯ ИЗ ПАРАМЕТРОВ
 function buildCustomStyle(styleParams) {
   const defaults = {
     fontsize: 8,
     fontcolor: 'ffffff',
+    fontName: 'Roboto',  // Новый параметр
     bold: false,
     outline: true,
     position: 'bottom',
@@ -85,6 +108,9 @@ function buildCustomStyle(styleParams) {
   };
   
   const params = { ...defaults, ...styleParams };
+  
+  // Валидация fontName
+  const validatedFont = validateFont(params.fontName);
   
   // Валидация параметров
   params.fontsize = Math.max(6, Math.min(12, parseInt(params.fontsize) || 8));
@@ -124,7 +150,7 @@ function buildCustomStyle(styleParams) {
   const style = {
     fontsize: params.fontsize,
     fontcolor: params.fontcolor,
-    fontname: AVAILABLE_FONTS[0],
+    fontname: validatedFont,  // Используем валидированный шрифт
     bold: params.bold ? 1 : 0,
     alignment: positionSettings.alignment,
     marginv: positionSettings.marginv
@@ -148,7 +174,7 @@ function buildCustomStyle(styleParams) {
   
   return {
     style,
-    description: `Custom style: ${params.fontsize}px, ${params.fontcolor}, ${params.position}, outline: ${params.outline}, bg: ${backgroundInfo.description}, bold: ${params.bold}`
+    description: `${validatedFont} ${params.fontsize}px, ${params.fontcolor}, ${params.position}, outline: ${params.outline}, bg: ${backgroundInfo.description}, bold: ${params.bold}`
   };
 }
 
@@ -354,11 +380,13 @@ app.get('/health', (req, res) => {
     mode: 'CUSTOM_STYLES_WITH_MAXIMUM_QUALITY_STREAMING_PRODUCTION',
     style_system: 'CUSTOM_PARAMETERS_WITH_SEPARATE_BACKGROUND_OPACITY',
     available_fonts: AVAILABLE_FONTS,
+    supported_fonts: AVAILABLE_FONTS,
     available_positions: Object.keys(SUBTITLE_POSITIONS),
     quality_mode: 'NO_COMPRESSION_MAXIMUM_QUALITY_STREAMING_ENABLED',
     style_parameters: {
       fontsize: 'number (6-12)',
       fontcolor: 'string (hex without #)',
+      fontName: `string (${AVAILABLE_FONTS.join(' | ')})`,
       bold: 'boolean',
       outline: 'boolean',
       position: 'string (bottom/top/center)',
@@ -389,6 +417,7 @@ function getSystemInfo() {
       ffmpeg_available: true,
       ffmpeg_version: ffmpegVersion,
       fonts_available: availableFonts,
+      supported_fonts: AVAILABLE_FONTS,
       subtitle_method: 'CUSTOM_STYLES_WITH_JSON_RESPONSE'
     };
   } catch (error) {
@@ -496,6 +525,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     const styleParams = {
       fontsize: req.body.fontsize,
       fontcolor: req.body.fontcolor,
+      fontName: req.body.fontName,  // Новый параметр
       bold: req.body.bold,
       outline: req.body.outline,
       position: req.body.position,
@@ -507,6 +537,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     
     console.log(`[${taskId}] Video size: ${(videoBuffer.length / 1024 / 1024).toFixed(2)}MB`);
     console.log(`[${taskId}] Quality mode: ${forceQuality}`);
+    console.log(`[${taskId}] Font requested: ${styleParams.fontName || 'default'}`);
     
     // 🎨 СОЗДАЕМ КАСТОМНЫЙ СТИЛЬ
     const { style: selectedStyle, description: styleDescription } = buildCustomStyle(styleParams);
@@ -584,7 +615,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     // Строим FFmpeg команды с fallback логикой
     const mainCommand = `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${styleString}'" -c:a copy -c:v libx264 -preset ${optimalSettings.preset} -crf ${optimalSettings.crf} -pix_fmt yuv420p${optimalSettings.tune ? ` -tune ${optimalSettings.tune}` : ''} -profile:v ${optimalSettings.profile}${optimalSettings.level ? ` -level ${optimalSettings.level}` : ''} -movflags +faststart -y "${outputVideoPath}"`;
 
-    const simplifiedStyleString = `Fontname=DejaVu Sans,Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${selectedStyle.outline || 2}${selectedStyle.backcolour ? `,BackColour=${selectedStyle.backcolour},BorderStyle=4` : ''}`;
+    const simplifiedStyleString = `Fontname=${selectedStyle.fontname},Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${selectedStyle.outline || 2}${selectedStyle.backcolour ? `,BackColour=${selectedStyle.backcolour},BorderStyle=4` : ''}`;
     
     const commands = [
       mainCommand,
@@ -732,15 +763,17 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
 const server = app.listen(PORT, () => {
   console.log(`🎨 CUSTOM STYLE Subtitle Service running on port ${PORT}`);
   console.log(`📱 Ready for custom subtitle styles with MAXIMUM QUALITY!`);
-  console.log(`🎯 Style system: CUSTOM_PARAMETERS_WITH_SEPARATE_BACKGROUND_OPACITY`);
+  console.log(`🎯 Style system: CUSTOM_PARAMETERS_WITH_FONT_SELECTION`);
   console.log(`✨ Available parameters:`);
   console.log(`   • fontsize (6-12) - Text size`);
   console.log(`   • fontcolor (hex) - Text color`);
+  console.log(`   • fontName (${AVAILABLE_FONTS.length} fonts) - Font family`);
   console.log(`   • bold (true/false) - Bold text`);
   console.log(`   • outline (true/false) - Text outline`);
   console.log(`   • background (RRGGBB) - Background color as 6-character hex`);
   console.log(`   • backgroundOpacity (0-1) - Background visibility (0=transparent, 1=opaque)`);
   console.log(`   • position (bottom/top/center) - Text position`);
+  console.log(`🎯 Available fonts: ${AVAILABLE_FONTS.join(', ')}`);
   console.log(`🎯 Quality modes: auto | lossless | ultra | high | medium | low`);
   console.log(`🚀 Endpoints:`);
   console.log(`   • POST /process-video-stream (Custom styles - JSON response)`);
@@ -748,7 +781,7 @@ const server = app.listen(PORT, () => {
   
   const systemInfo = getSystemInfo();
   console.log(`FFmpeg: ${systemInfo.ffmpeg_available}`);
-  console.log(`Quality Mode: CUSTOM_STYLES_PRODUCTION_READY`);
+  console.log(`Quality Mode: CUSTOM_STYLES_WITH_FONT_SELECTION_READY`);
 });
 
 // Увеличиваем timeout сервера
