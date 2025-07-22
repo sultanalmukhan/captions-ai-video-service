@@ -757,6 +757,193 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
   }
 });
 
+// ОТЛАДОЧНЫЙ ENDPOINT ДЛЯ ПРОВЕРКИ ШРИФТОВ FFMPEG
+// Добавьте в server.js, потом удалите
+
+app.get('/debug-ffmpeg-fonts', (req, res) => {
+  console.log('=== DEBUGGING FFMPEG FONTS ===');
+  
+  const results = {
+    timestamp: new Date().toISOString(),
+    tests: []
+  };
+  
+  const FONTS_TO_DEBUG = [
+    'DejaVu Sans', 'Liberation Sans', 'FreeSans', 'Arial', 'Helvetica',
+    'Times New Roman', 'Georgia', 'Courier New', 'Monospace', 'Sans-Serif', 'Serif'
+  ];
+  
+  // 1. Проверим fontconfig список
+  try {
+    const fcListOutput = execSync('fc-list : family', { encoding: 'utf8' });
+    const systemFonts = fcListOutput
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0)
+      .sort();
+    
+    results.fontconfig_families = systemFonts.slice(0, 20); // Первые 20
+    console.log(`Found ${systemFonts.length} font families via fc-list`);
+  } catch (err) {
+    results.fontconfig_error = err.message;
+  }
+  
+  // 2. Тестируем каждый шрифт через FFmpeg drawtext
+  for (const fontName of FONTS_TO_DEBUG) {
+    const testResult = {
+      font_name: fontName,
+      tests: []
+    };
+    
+    // Тест 1: Прямое имя
+    try {
+      const cmd1 = `ffmpeg -f lavfi -i "color=c=black:size=200x50:d=1" -vf "drawtext=text='Test':fontsize=20:fontcolor=white:x=10:y=20:font='${fontName}'" -frames:v 1 -y /tmp/font_debug_1.png 2>&1`;
+      const output1 = execSync(cmd1, { encoding: 'utf8', timeout: 5000 });
+      
+      testResult.tests.push({
+        method: 'direct_name',
+        font_param: fontName,
+        success: !output1.includes('Invalid font') && !output1.includes('No such file'),
+        output_sample: output1.split('\n').slice(-3).join(' ').substring(0, 200)
+      });
+    } catch (err) {
+      testResult.tests.push({
+        method: 'direct_name',
+        font_param: fontName,
+        success: false,
+        error: err.message.substring(0, 100)
+      });
+    }
+    
+    // Тест 2: Попробуем найти файл шрифта
+    try {
+      const findCmd = `fc-match "${fontName}" -f "%{file}"`;
+      const fontFile = execSync(findCmd, { encoding: 'utf8' }).trim();
+      
+      if (fontFile && fontFile !== '') {
+        // Тест 3: Используем полный путь к файлу
+        try {
+          const cmd2 = `ffmpeg -f lavfi -i "color=c=black:size=200x50:d=1" -vf "drawtext=text='Test':fontsize=20:fontcolor=white:x=10:y=20:fontfile='${fontFile}'" -frames:v 1 -y /tmp/font_debug_2.png 2>&1`;
+          const output2 = execSync(cmd2, { encoding: 'utf8', timeout: 5000 });
+          
+          testResult.tests.push({
+            method: 'font_file_path',
+            font_param: fontFile,
+            success: !output2.includes('Invalid font') && !output2.includes('No such file'),
+            output_sample: output2.split('\n').slice(-3).join(' ').substring(0, 200)
+          });
+        } catch (err) {
+          testResult.tests.push({
+            method: 'font_file_path',
+            font_param: fontFile,
+            success: false,
+            error: err.message.substring(0, 100)
+          });
+        }
+      }
+      
+      testResult.font_file = fontFile;
+    } catch (err) {
+      testResult.font_file_error = err.message;
+    }
+    
+    results.tests.push(testResult);
+  }
+  
+  // Очистка временных файлов
+  try {
+    execSync('rm -f /tmp/font_debug_*.png');
+  } catch (e) {}
+  
+  // Анализируем результаты
+  const workingFonts = results.tests
+    .filter(test => test.tests.some(t => t.success))
+    .map(test => ({
+      name: test.font_name,
+      working_methods: test.tests.filter(t => t.success).map(t => t.method)
+    }));
+  
+  results.analysis = {
+    total_fonts_tested: FONTS_TO_DEBUG.length,
+    fonts_working: workingFonts.length,
+    working_fonts: workingFonts,
+    recommendations: []
+  };
+  
+  // Генерируем рекомендации
+  if (workingFonts.length === 0) {
+    results.analysis.recommendations.push("No fonts working - check FFmpeg installation");
+  } else {
+    results.analysis.recommendations.push(`Use these ${workingFonts.length} working fonts: ${workingFonts.map(f => f.name).join(', ')}`);
+    
+    const fontsWithFiles = results.tests.filter(t => t.font_file && t.font_file.includes('.ttf'));
+    if (fontsWithFiles.length > 0) {
+      results.analysis.recommendations.push("Consider using fontfile parameter instead of font parameter for better reliability");
+    }
+  }
+  
+  console.log(`Analysis complete: ${workingFonts.length}/${FONTS_TO_DEBUG.length} fonts working`);
+  
+  res.json(results);
+});
+
+// ПРОСТОЙ ТЕСТ ОДНОГО ШРИФТА
+app.get('/test-single-font/:fontName', (req, res) => {
+  const fontName = req.params.fontName;
+  console.log(`Testing single font: ${fontName}`);
+  
+  try {
+    // Создаем тестовое видео с субтитрами
+    const testSrt = `1\n00:00:00,000 --> 00:00:03,000\n${fontName} Test ABC 123\n\n`;
+    const srtPath = '/tmp/test_single.srt';
+    const videoPath = '/tmp/test_single_output.mp4';
+    
+    fs.writeFileSync(srtPath, testSrt, 'utf8');
+    
+    // Создаем простое видео
+    execSync(`ffmpeg -f lavfi -i "color=c=blue:size=400x200:d=3" -c:v libx264 -preset ultrafast -t 3 -y /tmp/test_single_input.mp4`, { timeout: 5000 });
+    
+    // Добавляем субтитры с тестируемым шрифтом
+    const styleString = `Fontname=${fontName},Fontsize=24,PrimaryColour=&Hffffff,OutlineColour=&H000000,Outline=2`;
+    const cmd = `ffmpeg -i /tmp/test_single_input.mp4 -vf "subtitles='${srtPath}':force_style='${styleString}'" -c:v libx264 -preset ultrafast -crf 28 -y "${videoPath}" 2>&1`;
+    
+    const output = execSync(cmd, { encoding: 'utf8', timeout: 10000 });
+    
+    if (fs.existsSync(videoPath)) {
+      const videoBuffer = fs.readFileSync(videoPath);
+      const base64Video = videoBuffer.toString('base64');
+      
+      // Очистка
+      ['test_single.srt', 'test_single_input.mp4', 'test_single_output.mp4'].forEach(file => {
+        try { fs.unlinkSync(`/tmp/${file}`); } catch (e) {}
+      });
+      
+      res.json({
+        success: true,
+        font_name: fontName,
+        video_size: videoBuffer.length,
+        video_base64: base64Video,
+        preview_url: `data:video/mp4;base64,${base64Video}`
+      });
+    } else {
+      res.json({
+        success: false,
+        font_name: fontName,
+        error: 'Video file not created',
+        ffmpeg_output: output.substring(0, 500)
+      });
+    }
+    
+  } catch (error) {
+    res.json({
+      success: false,
+      font_name: fontName,
+      error: error.message,
+      ffmpeg_output: error.stdout ? error.stdout.substring(0, 500) : 'No output'
+    });
+  }
+});
+
 // Настройки для сервера
 const server = app.listen(PORT, () => {
   console.log(`🎨 CUSTOM STYLE Subtitle Service running on port ${PORT}`);
