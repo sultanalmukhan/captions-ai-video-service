@@ -759,6 +759,141 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
   }
 });
 
+
+app.get('/check-fonts', (req, res) => {
+  console.log('=== CHECKING AVAILABLE FONTS ===');
+  
+  // Исходный список шрифтов из iOS приложения
+  const REQUESTED_FONTS = [
+    'Roboto', 'Open Sans', 'Arial', 'Helvetica', 'Montserrat', 
+    'Lato', 'Source Sans Pro', 'Poppins', 'Inter', 'Ubuntu', 
+    'Oswald', 'Raleway', 'Nunito', 'Quicksand', 'Courier New', 
+    'Georgia', 'Merriweather'
+  ];
+  
+  const fontCheckResults = [];
+  
+  // Проверяем каждый шрифт через FFmpeg
+  REQUESTED_FONTS.forEach(fontName => {
+    try {
+      // Создаем тестовое изображение с шрифтом
+      const testCommand = `ffmpeg -f lavfi -i "color=c=black:size=100x50:d=1" -vf "drawtext=text='Test':fontfile='':fontsize=20:fontcolor=white:x=10:y=10:font='${fontName}'" -frames:v 1 -y /tmp/font_test_${fontName.replace(/\s+/g, '_')}.png 2>&1`;
+      
+      const result = execSync(testCommand, { 
+        encoding: 'utf8', 
+        timeout: 5000 
+      });
+      
+      // Если команда выполнилась без ошибок о шрифте
+      if (!result.includes('Invalid font') && 
+          !result.includes('No such file') && 
+          !result.includes('fontconfig')) {
+        fontCheckResults.push({
+          font: fontName,
+          status: 'AVAILABLE',
+          method: 'ffmpeg_drawtext'
+        });
+      } else {
+        fontCheckResults.push({
+          font: fontName,
+          status: 'NOT_AVAILABLE',
+          error: 'FFmpeg font not found',
+          method: 'ffmpeg_drawtext'
+        });
+      }
+      
+    } catch (error) {
+      fontCheckResults.push({
+        font: fontName,
+        status: 'ERROR',
+        error: error.message.substring(0, 100),
+        method: 'ffmpeg_drawtext'
+      });
+    }
+  });
+  
+  // Альтернативная проверка через fontconfig
+  let systemFonts = [];
+  try {
+    const fcListOutput = execSync('fc-list :family', { encoding: 'utf8' });
+    systemFonts = fcListOutput
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0)
+      .slice(0, 20); // Первые 20 для примера
+      
+    console.log('System fonts found:', systemFonts.length);
+  } catch (err) {
+    console.log('fc-list not available');
+  }
+  
+  // Проверяем стандартные безопасные шрифты
+  const SAFE_FONTS = [
+    'DejaVu Sans', 'Liberation Sans', 'FreeSans', 
+    'Arial', 'Helvetica', 'Times New Roman', 'Georgia',
+    'Courier New', 'Monospace', 'Sans-Serif', 'Serif'
+  ];
+  
+  const safeFontResults = [];
+  SAFE_FONTS.forEach(fontName => {
+    try {
+      const testCommand = `ffmpeg -f lavfi -i "color=c=black:size=100x50:d=1" -vf "drawtext=text='Test':fontsize=20:fontcolor=white:x=10:y=10:font='${fontName}'" -frames:v 1 -y /tmp/safe_font_test.png 2>&1`;
+      
+      const result = execSync(testCommand, { 
+        encoding: 'utf8', 
+        timeout: 3000 
+      });
+      
+      if (!result.includes('Invalid font') && 
+          !result.includes('No such file')) {
+        safeFontResults.push({
+          font: fontName,
+          status: 'AVAILABLE'
+        });
+      }
+    } catch (error) {
+      // Игнорируем ошибки для safe fonts
+    }
+  });
+  
+  // Очищаем тестовые файлы
+  try {
+    execSync('rm -f /tmp/font_test_*.png /tmp/safe_font_test.png');
+  } catch (e) {}
+  
+  const availableFonts = fontCheckResults
+    .filter(result => result.status === 'AVAILABLE')
+    .map(result => result.font);
+    
+  const availableSafeFonts = safeFontResults
+    .filter(result => result.status === 'AVAILABLE')
+    .map(result => result.font);
+  
+  // Финальный рекомендуемый список
+  const recommendedFonts = [...new Set([...availableFonts, ...availableSafeFonts])];
+  
+  res.json({
+    timestamp: new Date().toISOString(),
+    requested_fonts_check: fontCheckResults,
+    available_requested_fonts: availableFonts,
+    system_fonts_sample: systemFonts.slice(0, 10),
+    safe_fonts_check: safeFontResults,
+    available_safe_fonts: availableSafeFonts,
+    recommended_font_list: recommendedFonts,
+    summary: {
+      requested_available: availableFonts.length,
+      requested_total: REQUESTED_FONTS.length,
+      safe_available: availableSafeFonts.length,
+      recommended_total: recommendedFonts.length
+    },
+    next_steps: [
+      "Use 'recommended_font_list' as new AVAILABLE_FONTS array",
+      "Test with actual subtitle generation",
+      "Remove this endpoint in production"
+    ]
+  });
+});
+
 // Настройки для сервера
 const server = app.listen(PORT, () => {
   console.log(`🎨 CUSTOM STYLE Subtitle Service running on port ${PORT}`);
