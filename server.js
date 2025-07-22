@@ -83,9 +83,7 @@ const AVAILABLE_FONTS = [
   'Merriweather'
 ];
 
-// 🎯 УЛУЧШЕННАЯ СИСТЕМА ВАЛИДАЦИИ ШРИФТОВ
-
-// Кеш для проверенных шрифтов
+// 🎯 СИСТЕМА ВАЛИДАЦИИ ШРИФТОВ
 let fontValidationCache = new Map();
 let allAvailableFonts = null;
 
@@ -99,7 +97,6 @@ function getAllAvailableFonts() {
     
     output.split('\n').forEach(line => {
       if (line.trim()) {
-        // Обрабатываем строки вида "Font Name,Alternative Name" или "Font Name"
         const fontNames = line.split(',').map(name => name.trim());
         fontNames.forEach(name => {
           if (name) families.add(name);
@@ -108,22 +105,24 @@ function getAllAvailableFonts() {
     });
     
     allAvailableFonts = Array.from(families);
-    console.log(`📋 Found ${allAvailableFonts.length} font families in system`);
+    console.log(`📋 System fonts found: ${allAvailableFonts.length}`);
     return allAvailableFonts;
     
   } catch (error) {
     console.error('❌ Error getting font families:', error.message);
-    return [];
+    return ['DejaVu Sans', 'Liberation Sans', 'Arial']; // fallback
   }
 }
 
-// Умная функция поиска шрифта
+// Функция поиска лучшего совпадения шрифта
 function findBestFontMatch(requestedFont) {
   if (!requestedFont) return 'DejaVu Sans';
   
   // Проверяем кеш
   if (fontValidationCache.has(requestedFont)) {
-    return fontValidationCache.get(requestedFont);
+    const cached = fontValidationCache.get(requestedFont);
+    console.log(`🔍 [FONT] Using cached: "${requestedFont}" → "${cached}"`);
+    return cached;
   }
   
   const availableFonts = getAllAvailableFonts();
@@ -132,6 +131,7 @@ function findBestFontMatch(requestedFont) {
   // 1. Точное совпадение
   if (availableFonts.includes(requestedFont)) {
     bestMatch = requestedFont;
+    console.log(`✅ [FONT] Exact match found: "${requestedFont}"`);
   }
   
   // 2. Точное совпадение без учета регистра
@@ -139,26 +139,25 @@ function findBestFontMatch(requestedFont) {
     bestMatch = availableFonts.find(font => 
       font.toLowerCase() === requestedFont.toLowerCase()
     );
+    if (bestMatch) {
+      console.log(`✅ [FONT] Case-insensitive match: "${requestedFont}" → "${bestMatch}"`);
+    }
   }
   
-  // 3. Частичное совпадение (содержит)
+  // 3. Частичное совпадение
   if (!bestMatch) {
     bestMatch = availableFonts.find(font => 
       font.toLowerCase().includes(requestedFont.toLowerCase())
     );
+    if (bestMatch) {
+      console.log(`⚡ [FONT] Partial match found: "${requestedFont}" → "${bestMatch}"`);
+    }
   }
   
-  // 4. Обратное частичное совпадение
-  if (!bestMatch) {
-    bestMatch = availableFonts.find(font => 
-      requestedFont.toLowerCase().includes(font.toLowerCase())
-    );
-  }
-  
-  // 5. Специальные правила для популярных шрифтов
+  // 4. Специальные правила для популярных шрифтов
   if (!bestMatch) {
     const specialMappings = {
-      'roboto': ['Roboto', 'Ubuntu', 'DejaVu Sans'],
+      'roboto': ['Roboto', 'Ubuntu', 'DejaVu Sans', 'Liberation Sans'],
       'montserrat': ['Montserrat', 'Liberation Sans', 'DejaVu Sans'],
       'open sans': ['Open Sans', 'Liberation Sans', 'DejaVu Sans'],
       'arial': ['Arial', 'Liberation Sans', 'DejaVu Sans'],
@@ -172,140 +171,39 @@ function findBestFontMatch(requestedFont) {
       for (const candidate of specialMappings[key]) {
         if (availableFonts.includes(candidate)) {
           bestMatch = candidate;
+          console.log(`🎯 [FONT] Special mapping: "${requestedFont}" → "${bestMatch}"`);
           break;
         }
       }
     }
   }
   
-  // 6. Fallback к системным шрифтам
+  // 5. Fallback к системным шрифтам
   if (!bestMatch) {
-    const systemFallbacks = [
-      'DejaVu Sans', 'Liberation Sans', 'Ubuntu', 'Noto Sans',
-      'FreeSans', 'sans-serif'
-    ];
-    
+    const systemFallbacks = ['DejaVu Sans', 'Liberation Sans', 'Ubuntu', 'Arial', 'FreeSans'];
     bestMatch = systemFallbacks.find(font => availableFonts.includes(font)) || 'DejaVu Sans';
+    console.log(`⚠️ [FONT] Using fallback: "${requestedFont}" → "${bestMatch}"`);
   }
   
   // Сохраняем в кеш
   fontValidationCache.set(requestedFont, bestMatch);
   
-  if (bestMatch !== requestedFont) {
-    console.log(`🔄 Font mapping: "${requestedFont}" → "${bestMatch}"`);
-  }
-  
   return bestMatch;
 }
 
-// Функция валидации шрифта (обновленная)
-function validateFont(fontName) {
-  return findBestFontMatch(fontName);
-}
-
-// Функция для тестирования шрифта с FFmpeg
-function testFontWithFFmpeg(fontName) {
-  try {
-    const testCmd = `ffmpeg -f lavfi -i testsrc2=duration=0.1:size=100x50:rate=1 -vf "subtitles=text='test':force_style='Fontname=${fontName}'" -frames:v 1 -y /dev/null`;
-    execSync(testCmd, { stdio: 'pipe', timeout: 5000 });
-    return true;
-  } catch (error) {
-    return false;
+// 🔧 HELPER ФУНКЦИИ
+function parseBooleanParam(value) {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const lowercased = value.toLowerCase().trim();
+    return lowercased === 'true' || lowercased === '1' || lowercased === 'yes';
   }
-}
-
-// 🎨 ФУНКЦИЯ СОЗДАНИЯ СТИЛЯ ИЗ ПАРАМЕТРОВ (ОБНОВЛЕННАЯ)
-function buildCustomStyle(styleParams) {
-  const defaults = {
-    fontsize: 8,
-    fontcolor: 'ffffff',
-    fontName: 'Roboto',
-    bold: false,
-    outline: true,
-    position: 'bottom',
-    background: '',
-    backgroundOpacity: 0.5
-  };
-  
-  const params = { ...defaults, ...styleParams };
-  
-  // УЛУЧШЕННАЯ валидация fontName
-  const validatedFont = findBestFontMatch(params.fontName);
-  
-  // Валидация параметров
-  params.fontsize = Math.max(6, Math.min(12, parseInt(params.fontsize) || 8));
-  
-  // Обработка fontcolor с конвертацией RGB в BGR
-  params.fontcolor = (params.fontcolor || 'ffffff').replace('#', '').toLowerCase();
-  
-  if (!/^[0-9a-f]{6}$/.test(params.fontcolor)) {
-    params.fontcolor = 'ffffff';
-  }
-  
-  // Конвертируем RGB в BGR для FFmpeg
-  if (params.fontcolor.length === 6) {
-    const red = params.fontcolor.substring(0, 2);
-    const green = params.fontcolor.substring(2, 4);
-    const blue = params.fontcolor.substring(4, 6);
-    params.fontcolor = `${blue}${green}${red}`; // BGR формат
-  }
-  
-  params.bold = parseBooleanParam(params.bold);
-  params.outline = parseBooleanParam(params.outline);
-  
-  // Валидация backgroundOpacity с правильной обработкой 0
-  if (styleParams.backgroundOpacity !== undefined) {
-    params.backgroundOpacity = Math.max(0, Math.min(1, parseFloat(styleParams.backgroundOpacity)));
-  } else {
-    params.backgroundOpacity = 0.5;
-  }
-  
-  if (!['bottom', 'top', 'center'].includes(params.position)) {
-    params.position = 'bottom';
-  }
-  
-  const positionSettings = SUBTITLE_POSITIONS[params.position];
-  
-  // Строим финальный стиль
-  const style = {
-    fontsize: params.fontsize,
-    fontcolor: params.fontcolor,
-    fontname: validatedFont,  // Используем проверенный шрифт
-    bold: params.bold ? 1 : 0,
-    alignment: positionSettings.alignment,
-    marginv: positionSettings.marginv
-  };
-  
-  // Добавляем обводку
-  if (params.outline) {
-    style.outline = 2;
-    style.shadow = 1;
-  } else {
-    style.outline = 0;
-    style.shadow = 0;
-  }
-  
-  // Обрабатываем цвет фона
-  const backgroundInfo = parseBackgroundColor(params.background, params.backgroundOpacity);
-  if (backgroundInfo.enabled) {
-    style.backcolour = backgroundInfo.ffmpegColor;
-    style.borderstyle = 4;
-  }
-  
-  return {
-    style,
-    description: `${validatedFont} ${params.fontsize}px, ${params.fontcolor}, ${params.position}, outline: ${params.outline}, bg: ${backgroundInfo.description}, bold: ${params.bold}`,
-    font_mapping: {
-      requested: params.fontName,
-      actual: validatedFont,
-      exact_match: params.fontName === validatedFont
-    }
-  };
+  if (typeof value === 'number') return value !== 0;
+  return false;
 }
 
 // 🎨 ФУНКЦИЯ ПАРСИНГА ЦВЕТА ФОНА
 function parseBackgroundColor(backgroundParam, opacityParam) {
-  // Если пустая строка - отключаем фон
   if (!backgroundParam || backgroundParam === '' || backgroundParam === 'false') {
     return {
       enabled: false,
@@ -314,7 +212,6 @@ function parseBackgroundColor(backgroundParam, opacityParam) {
     };
   }
   
-  // Для обратной совместимости
   if (backgroundParam === true || backgroundParam === 'true') {
     return {
       enabled: true,
@@ -325,7 +222,6 @@ function parseBackgroundColor(backgroundParam, opacityParam) {
   
   let colorString = String(backgroundParam).trim().replace('#', '');
   
-  // Проверяем валидность 6-символьного hex
   if (!/^[0-9a-fA-F]{6}$/.test(colorString)) {
     return {
       enabled: false,
@@ -334,23 +230,19 @@ function parseBackgroundColor(backgroundParam, opacityParam) {
     };
   }
   
-  // Извлекаем RGB компоненты
   const red = colorString.substring(0, 2);
   const green = colorString.substring(2, 4);
   const blue = colorString.substring(4, 6);
   
-  // Конвертируем opacity в alpha с правильной обработкой 0
   let opacity = parseFloat(opacityParam);
   if (isNaN(opacity) || opacityParam === undefined || opacityParam === null || opacityParam === '') {
     opacity = 0.5;
   }
   opacity = Math.max(0, Math.min(1, opacity));
   
-  // Инвертируем для FFmpeg (opacity 0 = alpha FF, opacity 1 = alpha 00)
   const alphaValue = Math.round((1 - opacity) * 255);
   const alpha = alphaValue.toString(16).padStart(2, '0').toUpperCase();
   
-  // FFmpeg формат &HAABBGGRR
   const ffmpegColor = `&H${alpha}${blue}${green}${red}`.toUpperCase();
   
   const opacityPercent = Math.round(opacity * 100);
@@ -365,15 +257,93 @@ function parseBackgroundColor(backgroundParam, opacityParam) {
   };
 }
 
-// 🔧 HELPER ФУНКЦИЯ ДЛЯ ПАРСИНГА BOOLEAN ПАРАМЕТРОВ
-function parseBooleanParam(value) {
-  if (typeof value === 'boolean') return value;
-  if (typeof value === 'string') {
-    const lowercased = value.toLowerCase().trim();
-    return lowercased === 'true' || lowercased === '1' || lowercased === 'yes';
+// 🎨 ФУНКЦИЯ СОЗДАНИЯ СТИЛЯ ИЗ ПАРАМЕТРОВ
+function buildCustomStyle(styleParams) {
+  const defaults = {
+    fontsize: 8,
+    fontcolor: 'ffffff',
+    fontName: 'Roboto',
+    bold: false,
+    outline: true,
+    position: 'bottom',
+    background: '',
+    backgroundOpacity: 0.5
+  };
+  
+  const params = { ...defaults, ...styleParams };
+  
+  // Валидация fontName с подробными логами
+  console.log(`🔍 [STYLE] Font requested: "${params.fontName}"`);
+  const validatedFont = findBestFontMatch(params.fontName);
+  console.log(`✅ [STYLE] Font resolved: "${validatedFont}"`);
+  
+  // Валидация остальных параметров
+  params.fontsize = Math.max(6, Math.min(12, parseInt(params.fontsize) || 8));
+  
+  params.fontcolor = (params.fontcolor || 'ffffff').replace('#', '').toLowerCase();
+  
+  if (!/^[0-9a-f]{6}$/.test(params.fontcolor)) {
+    params.fontcolor = 'ffffff';
   }
-  if (typeof value === 'number') return value !== 0;
-  return false;
+  
+  // Конвертируем RGB в BGR для FFmpeg
+  if (params.fontcolor.length === 6) {
+    const red = params.fontcolor.substring(0, 2);
+    const green = params.fontcolor.substring(2, 4);
+    const blue = params.fontcolor.substring(4, 6);
+    params.fontcolor = `${blue}${green}${red}`;
+  }
+  
+  params.bold = parseBooleanParam(params.bold);
+  params.outline = parseBooleanParam(params.outline);
+  
+  if (styleParams.backgroundOpacity !== undefined) {
+    params.backgroundOpacity = Math.max(0, Math.min(1, parseFloat(styleParams.backgroundOpacity)));
+  } else {
+    params.backgroundOpacity = 0.5;
+  }
+  
+  if (!['bottom', 'top', 'center'].includes(params.position)) {
+    params.position = 'bottom';
+  }
+  
+  const positionSettings = SUBTITLE_POSITIONS[params.position];
+  
+  const style = {
+    fontsize: params.fontsize,
+    fontcolor: params.fontcolor,
+    fontname: validatedFont,
+    bold: params.bold ? 1 : 0,
+    alignment: positionSettings.alignment,
+    marginv: positionSettings.marginv
+  };
+  
+  if (params.outline) {
+    style.outline = 2;
+    style.shadow = 1;
+  } else {
+    style.outline = 0;
+    style.shadow = 0;
+  }
+  
+  const backgroundInfo = parseBackgroundColor(params.background, params.backgroundOpacity);
+  if (backgroundInfo.enabled) {
+    style.backcolour = backgroundInfo.ffmpegColor;
+    style.borderstyle = 4;
+  }
+  
+  const isExactMatch = params.fontName === validatedFont;
+  console.log(`🎨 [STYLE] Final style created - Font: ${validatedFont}, Size: ${style.fontsize}, Bold: ${style.bold}, Exact match: ${isExactMatch}`);
+  
+  return {
+    style,
+    description: `${validatedFont} ${params.fontsize}px, ${params.fontcolor}, ${params.position}, outline: ${params.outline}, bg: ${backgroundInfo.description}, bold: ${params.bold}`,
+    font_mapping: {
+      requested: params.fontName,
+      actual: validatedFont,
+      exact_match: isExactMatch
+    }
+  };
 }
 
 // 🎯 ФУНКЦИЯ АНАЛИЗА КАЧЕСТВА ИСХОДНОГО ВИДЕО
@@ -495,243 +465,6 @@ function getQualitySettings(forceQuality, videoQuality) {
   return settings;
 }
 
-// Health check
-app.get('/health', (req, res) => {
-  const systemInfo = getSystemInfo();
-  
-  res.json({ 
-    status: 'healthy', 
-    timestamp: new Date().toISOString(),
-    mode: 'CUSTOM_STYLES_WITH_IMPROVED_FONT_SYSTEM_STREAMING_PRODUCTION',
-    style_system: 'SMART_FONT_MATCHING_WITH_FALLBACKS',
-    available_fonts: AVAILABLE_FONTS,
-    supported_fonts: AVAILABLE_FONTS,
-    available_positions: Object.keys(SUBTITLE_POSITIONS),
-    quality_mode: 'NO_COMPRESSION_MAXIMUM_QUALITY_STREAMING_ENABLED',
-    style_parameters: {
-      fontsize: 'number (6-12)',
-      fontcolor: 'string (hex without #)',
-      fontName: `string (${AVAILABLE_FONTS.join(' | ')})`,
-      bold: 'boolean',
-      outline: 'boolean',
-      position: 'string (bottom/top/center)',
-      background: 'string (6-character hex color RRGGBB, or empty string for no background)',
-      backgroundOpacity: 'number (0-1, where 0=transparent, 1=opaque)'
-    },
-    endpoints: [
-      '/process-video-stream (Custom styles - JSON response)',
-      '/health (This endpoint)',
-      '/working-fonts (Font mapping status)',
-      '/debug-fonts-detailed (Detailed font analysis)'
-    ],
-    ...systemInfo
-  });
-});
-
-// 🔍 РАСШИРЕННЫЙ ДИАГНОСТИЧЕСКИЙ ENDPOINT
-app.get('/debug-fonts-detailed', (req, res) => {
-  console.log('🔍 Detailed font analysis starting...');
-  
-  try {
-    const results = {};
-    
-    // 1. Проверяем физические файлы шрифтов
-    const fontDirs = ['/usr/share/fonts/custom', '/usr/share/fonts', '/usr/local/share/fonts'];
-    results.physical_files = {};
-    
-    for (const dir of fontDirs) {
-      try {
-        if (fs.existsSync(dir)) {
-          const files = execSync(`find "${dir}" -name "*.ttf" -o -name "*.otf" 2>/dev/null`, { encoding: 'utf8' })
-            .split('\n').filter(f => f.trim());
-          results.physical_files[dir] = files.slice(0, 20); // Первые 20 файлов
-        }
-      } catch (e) {
-        results.physical_files[dir] = `Error: ${e.message}`;
-      }
-    }
-    
-    // 2. Анализируем каждый наш шрифт через fc-match
-    const ourFonts = ['Roboto', 'Montserrat', 'Open Sans', 'Helvetica', 'Arial', 'Ubuntu', 'DejaVu Sans'];
-    results.font_matching = {};
-    
-    for (const font of ourFonts) {
-      try {
-        // Проверяем что fc-match возвращает для этого шрифта
-        const fcMatchResult = execSync(`fc-match "${font}"`, { encoding: 'utf8', timeout: 5000 }).trim();
-        
-        // Получаем подробную информацию
-        const fcMatchVerbose = execSync(`fc-match -v "${font}" | head -20`, { encoding: 'utf8', timeout: 5000 }).trim();
-        
-        // Проверяем все варианты имени
-        const fcListExact = execSync(`fc-list | grep -i "${font}" || echo "Not found"`, { encoding: 'utf8' }).trim();
-        
-        results.font_matching[font] = {
-          fc_match_result: fcMatchResult,
-          fc_match_details: fcMatchVerbose.split('\n').slice(0, 10),
-          fc_list_matches: fcListExact.split('\n').slice(0, 5),
-          available: fcListExact !== 'Not found'
-        };
-        
-      } catch (e) {
-        results.font_matching[font] = { error: e.message };
-      }
-    }
-    
-    // 3. Тестируем FFmpeg с разными именами шрифтов
-    results.ffmpeg_font_test = {};
-    const testFonts = ['Roboto', 'Montserrat', 'DejaVu Sans', 'Liberation Sans', 'Arial', 'sans-serif'];
-    
-    for (const font of testFonts) {
-      try {
-        // Создаем тестовое видео с субтитрами
-        const testSrt = '1\n00:00:01,000 --> 00:00:03,000\nTest Text\n\n';
-        const srtPath = `/tmp/test_${Date.now()}.srt`;
-        fs.writeFileSync(srtPath, testSrt);
-        
-        // Тестируем FFmpeg команду (не создаем реальное видео, просто проверяем ошибки)
-        const ffmpegCmd = `ffmpeg -f lavfi -i testsrc2=duration=1:size=320x240:rate=1 -vf "subtitles='${srtPath}':force_style='Fontname=${font},Fontsize=20'" -t 1 -y /dev/null`;
-        
-        execSync(ffmpegCmd, { 
-          encoding: 'utf8', 
-          timeout: 10000,
-          stdio: 'pipe' 
-        });
-        
-        results.ffmpeg_font_test[font] = {
-          success: true,
-          message: 'Font works with FFmpeg'
-        };
-        
-        // Удаляем тестовый файл
-        fs.unlinkSync(srtPath);
-        
-      } catch (e) {
-        results.ffmpeg_font_test[font] = {
-          success: false,
-          error: e.message,
-          stderr: e.stderr ? e.stderr.toString().split('\n').slice(-5) : []
-        };
-      }
-    }
-    
-    // 4. Получаем информацию о fontconfig
-    try {
-      results.fontconfig_info = {
-        version: execSync('fc-list --version', { encoding: 'utf8', timeout: 3000 }).trim(),
-        config_files: execSync('fc-conflist 2>/dev/null || echo "fc-conflist not available"', { encoding: 'utf8' }).trim(),
-        cache_dirs: execSync('fc-cache -v 2>&1 | grep "cache directory" || echo "No cache info"', { encoding: 'utf8' }).trim()
-      };
-    } catch (e) {
-      results.fontconfig_info = { error: e.message };
-    }
-    
-    // 5. Проверяем реальные имена семейств шрифтов
-    try {
-      const allFamilies = execSync(`fc-list : family | sort -u`, { encoding: 'utf8' })
-        .split('\n')
-        .filter(f => f.trim())
-        .slice(0, 50);
-        
-      results.available_families = allFamilies;
-      
-      // Ищем похожие на наши шрифты
-      results.similar_fonts = {};
-      for (const ourFont of ourFonts) {
-        const similar = allFamilies.filter(f => 
-          f.toLowerCase().includes(ourFont.toLowerCase()) || 
-          ourFont.toLowerCase().includes(f.toLowerCase())
-        );
-        if (similar.length > 0) {
-          results.similar_fonts[ourFont] = similar;
-        }
-      }
-      
-    } catch (e) {
-      results.available_families = { error: e.message };
-    }
-    
-    // 6. Специальная проверка для Montserrat
-    try {
-      results.montserrat_debug = {
-        fc_list_montserrat: execSync(`fc-list | grep -i montserrat || echo "Not found in fc-list"`, { encoding: 'utf8' }).trim(),
-        physical_files: execSync(`find /usr /tmp -name "*ontserrat*" 2>/dev/null || echo "No physical files"`, { encoding: 'utf8' }).trim(),
-        fc_match_montserrat: execSync(`fc-match "Montserrat" | head -3`, { encoding: 'utf8' }).trim(),
-        fc_match_verbose: execSync(`fc-match -v "Montserrat" | grep -E "(family|file|style)" | head -10`, { encoding: 'utf8' }).trim()
-      };
-    } catch (e) {
-      results.montserrat_debug = { error: e.message };
-    }
-    
-    res.json({
-      success: true,
-      timestamp: new Date().toISOString(),
-      server_info: {
-        os: execSync('uname -a', { encoding: 'utf8' }).trim(),
-        node_version: process.version
-      },
-      analysis: results,
-      recommendations: {
-        working_fonts: Object.keys(results.font_matching).filter(f => results.font_matching[f].available),
-        ffmpeg_compatible: Object.keys(results.ffmpeg_font_test).filter(f => results.ffmpeg_font_test[f].success)
-      }
-    });
-    
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      timestamp: new Date().toISOString()
-    });
-  }
-});
-
-// Endpoint для получения реально работающих шрифтов
-app.get('/working-fonts', (req, res) => {
-  try {
-    const ourFontsList = [
-      'Roboto', 'Montserrat', 'Open Sans', 'Arial', 'Helvetica',
-      'Lato', 'Source Sans Pro', 'Poppins', 'Inter', 'Ubuntu',
-      'Oswald', 'Raleway', 'Nunito', 'Quicksand', 'Courier New',
-      'Georgia', 'Merriweather'
-    ];
-    
-    const workingFonts = {};
-    const availableFonts = getAllAvailableFonts();
-    
-    ourFontsList.forEach(requestedFont => {
-      const actualFont = findBestFontMatch(requestedFont);
-      workingFonts[requestedFont] = {
-        mapped_to: actualFont,
-        exact_match: requestedFont === actualFont,
-        available: availableFonts.includes(actualFont)
-      };
-    });
-    
-    // Показываем топ системных шрифтов
-    const systemFonts = availableFonts.filter(font => 
-      font.includes('DejaVu') || font.includes('Liberation') || 
-      font.includes('Ubuntu') || font.includes('Noto') ||
-      font.includes('Sans') || font.includes('Serif') || font.includes('Mono')
-    ).slice(0, 20);
-    
-    res.json({
-      success: true,
-      timestamp: new Date().toISOString(),
-      font_mappings: workingFonts,
-      total_system_fonts: availableFonts.length,
-      recommended_system_fonts: systemFonts,
-      cache_size: fontValidationCache.size
-    });
-    
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
 function getSystemInfo() {
   try {
     const ffmpegVersion = execSync('ffmpeg -version', { encoding: 'utf8' }).split('\n')[0];
@@ -744,11 +477,6 @@ function getSystemInfo() {
       availableFonts = ['Font check failed'];
     }
     
-    return {
-      ffmpeg_available: true,
-      ffmpeg_version: ffmpegVersion,
-      fonts_available: availableFonts,
-      supported_fonts: AVAILABLE_FONTS,
     return {
       ffmpeg_available: true,
       ffmpeg_version: ffmpegVersion,
@@ -829,15 +557,44 @@ function beautifySRT(srtContent, taskId) {
   return beautifiedSrt;
 }
 
-// 🚀 ОСНОВНОЙ STREAMING ENDPOINT С УЛУЧШЕННОЙ СИСТЕМОЙ ШРИФТОВ
+// Health check
+app.get('/health', (req, res) => {
+  const systemInfo = getSystemInfo();
+  
+  res.json({ 
+    status: 'healthy', 
+    timestamp: new Date().toISOString(),
+    mode: 'CUSTOM_STYLES_WITH_SMART_FONT_SYSTEM_PRODUCTION',
+    style_system: 'SMART_FONT_MATCHING_WITH_FALLBACKS',
+    available_fonts: AVAILABLE_FONTS,
+    available_positions: Object.keys(SUBTITLE_POSITIONS),
+    quality_mode: 'NO_COMPRESSION_MAXIMUM_QUALITY_STREAMING_ENABLED',
+    style_parameters: {
+      fontsize: 'number (6-12)',
+      fontcolor: 'string (hex without #)',
+      fontName: `string (${AVAILABLE_FONTS.join(' | ')})`,
+      bold: 'boolean',
+      outline: 'boolean',
+      position: 'string (bottom/top/center)',
+      background: 'string (6-character hex color RRGGBB, or empty string for no background)',
+      backgroundOpacity: 'number (0-1, where 0=transparent, 1=opaque)'
+    },
+    endpoints: [
+      '/process-video-stream (Custom styles - JSON response)',
+      '/health (This endpoint)'
+    ],
+    ...systemInfo
+  });
+});
+
+// 🚀 ОСНОВНОЙ STREAMING ENDPOINT
 app.post('/process-video-stream', upload.single('video'), async (req, res) => {
   const taskId = req.body.task_id || uuidv4();
   const startTime = Date.now();
   
-  console.log(`\n=== [${taskId}] SMART FONT SYSTEM PROCESSING ===`);
+  console.log(`\n=== [${taskId}] PROCESSING START ===`);
 
   try {
-    // Валидация входных данных
     if (!req.file) {
       return res.status(400).json({
         success: false,
@@ -857,11 +614,10 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     const videoBuffer = req.file.buffer;
     const rawSrtContent = req.body.srt_content;
     
-    // 🎨 ПОЛУЧАЕМ ПАРАМЕТРЫ КАСТОМНОГО СТИЛЯ С УЛУЧШЕННОЙ ВАЛИДАЦИЕЙ ШРИФТОВ
     const styleParams = {
       fontsize: req.body.fontsize,
       fontcolor: req.body.fontcolor,
-      fontName: req.body.fontName,  // Умная валидация
+      fontName: req.body.fontName,
       bold: req.body.bold,
       outline: req.body.outline,
       position: req.body.position,
@@ -871,18 +627,13 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     
     const forceQuality = req.body.force_quality || 'auto';
     
-    console.log(`[${taskId}] Video size: ${(videoBuffer.length / 1024 / 1024).toFixed(2)}MB`);
-    console.log(`[${taskId}] Quality mode: ${forceQuality}`);
-    console.log(`[${taskId}] Font requested: ${styleParams.fontName || 'default'}`);
+    console.log(`📦 [${taskId}] Video size: ${(videoBuffer.length / 1024 / 1024).toFixed(2)}MB`);
+    console.log(`🎯 [${taskId}] Quality mode: ${forceQuality}`);
     
-    // 🎨 СОЗДАЕМ КАСТОМНЫЙ СТИЛЬ С УМНОЙ ВАЛИДАЦИЕЙ ШРИФТОВ
+    // Создаем кастомный стиль с подробными логами
     const { style: selectedStyle, description: styleDescription, font_mapping } = buildCustomStyle(styleParams);
-    console.log(`[${taskId}] Style: ${styleDescription}`);
-    if (font_mapping && !font_mapping.exact_match) {
-      console.log(`[${taskId}] 🔄 Font mapped: "${font_mapping.requested}" → "${font_mapping.actual}"`);
-    }
-
-    // Создаем временные файлы
+    console.log(`🎨 [${taskId}] Style created: ${styleDescription}`);
+    
     const tempDir = '/tmp/processing';
     if (!fs.existsSync(tempDir)) {
       fs.mkdirSync(tempDir, { recursive: true });
@@ -892,21 +643,17 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     const srtPath = path.join(tempDir, `stream_subtitles_${taskId}.srt`);
     const outputVideoPath = path.join(tempDir, `stream_output_${taskId}.mp4`);
 
-    // Сохраняем файлы
     fs.writeFileSync(inputVideoPath, videoBuffer);
 
-    // Анализируем качество
     const videoQuality = analyzeVideoQuality(inputVideoPath);
-    console.log(`[${taskId}] Input: ${videoQuality.resolution}, ${Math.round(videoQuality.bitrate / 1000)}kbps`);
+    console.log(`📹 [${taskId}] Input: ${videoQuality.resolution}, ${Math.round(videoQuality.bitrate / 1000)}kbps`);
 
-    // Выбираем настройки качества
     const optimalSettings = getQualitySettings(forceQuality, videoQuality);
 
-    // Beautify SRT
     const beautifiedSRT = beautifySRT(rawSrtContent, taskId);
     fs.writeFileSync(srtPath, beautifiedSRT, 'utf8');
 
-    // 🎨 СТРОИМ STYLE STRING ДЛЯ FFMPEG С ПРОВЕРЕННЫМ ШРИФТОМ
+    // Строим style string для FFmpeg с логами
     const buildStyleString = (style) => {
       let styleStr = `Fontsize=${style.fontsize}`;
       
@@ -950,11 +697,11 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     };
 
     const styleString = buildStyleString(selectedStyle);
+    console.log(`🔧 [${taskId}] FFmpeg style string: ${styleString}`);
 
-    // Строим FFmpeg команды с fallback логикой и улучшенной системой шрифтов
     const mainCommand = `ffmpeg -i "${inputVideoPath}" -vf "subtitles='${srtPath}':force_style='${styleString}'" -c:a copy -c:v libx264 -preset ${optimalSettings.preset} -crf ${optimalSettings.crf} -pix_fmt yuv420p${optimalSettings.tune ? ` -tune ${optimalSettings.tune}` : ''} -profile:v ${optimalSettings.profile}${optimalSettings.level ? ` -level ${optimalSettings.level}` : ''} -movflags +faststart -y "${outputVideoPath}"`;
 
-    // Fallback с системным шрифтом
+    // Fallback команды
     const systemFallbackFont = findBestFontMatch('DejaVu Sans');
     const simplifiedStyleString = `Fontname=${systemFallbackFont},Fontsize=${selectedStyle.fontsize},PrimaryColour=&H${selectedStyle.fontcolor || 'ffffff'},OutlineColour=&H000000,Outline=${selectedStyle.outline || 2}${selectedStyle.backcolour ? `,BackColour=${selectedStyle.backcolour},BorderStyle=4` : ''}`;
     
@@ -971,7 +718,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     // Выполняем команды последовательно
     for (let i = 0; i < commands.length && !success; i++) {
       try {
-        console.log(`[${taskId}] Trying method ${i + 1}...`);
+        console.log(`🔄 [${taskId}] Trying method ${i + 1}...`);
         
         if (fs.existsSync(outputVideoPath)) fs.unlinkSync(outputVideoPath);
         
@@ -986,14 +733,14 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
         if (fs.existsSync(outputVideoPath)) {
           const outputSize = fs.statSync(outputVideoPath).size;
           if (outputSize > 0) {
-            console.log(`[${taskId}] ✅ Success! Method ${i + 1} (${cmdDuration}ms)`);
+            console.log(`✅ [${taskId}] Success! Method ${i + 1} (${cmdDuration}ms)`);
             success = true;
             usedCommand = i + 1;
             break;
           }
         }
       } catch (error) {
-        console.log(`[${taskId}] ❌ Method ${i + 1} failed`);
+        console.log(`❌ [${taskId}] Method ${i + 1} failed: ${error.message}`);
       }
     }
 
@@ -1023,9 +770,10 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     const processingTime = Date.now() - startTime;
     const sizeChange = ((processedVideoBuffer.length / videoBuffer.length) - 1) * 100;
 
-    console.log(`[${taskId}] Complete: ${processingTime}ms, size change: ${sizeChange > 0 ? '+' : ''}${sizeChange.toFixed(1)}%`);
+    console.log(`🎉 [${taskId}] Complete: ${processingTime}ms, size change: ${sizeChange > 0 ? '+' : ''}${sizeChange.toFixed(1)}%`);
+    
     if (font_mapping && !font_mapping.exact_match) {
-      console.log(`[${taskId}] ✅ Font successfully mapped and applied`);
+      console.log(`🔄 [${taskId}] Font mapping applied: "${font_mapping.requested}" → "${font_mapping.actual}"`);
     }
 
     // Очистка временных файлов
@@ -1035,7 +783,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
       } catch (err) {}
     });
 
-    // Отправляем ответ с информацией о маппинге шрифтов
+    // Отправляем ответ
     res.json({
       success: true,
       task_id: taskId,
@@ -1080,7 +828,7 @@ app.post('/process-video-stream', upload.single('video'), async (req, res) => {
     });
 
   } catch (error) {
-    console.error(`[${taskId}] Error:`, error.message);
+    console.error(`💥 [${taskId}] Error: ${error.message}`);
 
     // Очистка при ошибке
     const tempFiles = [
@@ -1118,13 +866,10 @@ const server = app.listen(PORT, () => {
   console.log(`   • background (RRGGBB) - Background color as 6-character hex`);
   console.log(`   • backgroundOpacity (0-1) - Background visibility (0=transparent, 1=opaque)`);
   console.log(`   • position (bottom/top/center) - Text position`);
-  console.log(`🎯 Font system: Smart matching with automatic fallbacks`);
   console.log(`🎯 Quality modes: auto | lossless | ultra | high | medium | low`);
   console.log(`🚀 Endpoints:`);
   console.log(`   • POST /process-video-stream (Smart font system - JSON response)`);
   console.log(`   • GET /health (System status)`);
-  console.log(`   • GET /working-fonts (Font mapping status)`);
-  console.log(`   • GET /debug-fonts-detailed (Detailed font analysis)`);
   
   const systemInfo = getSystemInfo();
   console.log(`FFmpeg: ${systemInfo.ffmpeg_available}`);
@@ -1133,7 +878,7 @@ const server = app.listen(PORT, () => {
   // Инициализируем кеш шрифтов при старте
   console.log(`🔄 Initializing font cache...`);
   getAllAvailableFonts();
-  console.log(`✅ Font system initialized!`);
+  console.log(`✅ Font system initialized with ${fontValidationCache.size} cached mappings!`);
 });
 
 // Увеличиваем timeout сервера
